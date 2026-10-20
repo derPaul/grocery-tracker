@@ -33,6 +33,7 @@ from .const import (
     DOMAIN,
     MAIL_SCAN_INTERVAL,
     SERVICE_CATEGORIZE_PRODUCTS,
+    SERVICE_CHECK_MAILBOXES,
     SERVICE_IMPORT_RECEIPT,
     SERVICE_LIST_PRODUCTS,
     SERVICE_SET_CATEGORY,
@@ -45,7 +46,7 @@ from .coordinator import (
 from .parsers import ReceiptParseError
 from .storage import ReceiptStore
 
-PLATFORMS: list[Platform] = [Platform.SENSOR]
+PLATFORMS: list[Platform] = [Platform.BUTTON, Platform.SENSOR]
 
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
@@ -194,6 +195,31 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
             "categorized": categorized,
             "uncategorized": [name for name in unknown if name not in categorized],
         }
+
+    async def check_mailboxes(call: ServiceCall) -> ServiceResponse:
+        coordinator = _get_coordinator(hass)
+        statuses = await coordinator.async_check_mailboxes()
+        entry = coordinator.config_entry
+        return {
+            "mailboxes": [
+                {
+                    "mailbox": entry.subentries[subentry_id].title,
+                    "status": status.status,
+                    "new_messages": status.new_messages,
+                    "new_receipts": status.new_receipts,
+                    "error": status.error,
+                }
+                for subentry_id, status in statuses.items()
+                if subentry_id in entry.subentries
+            ]
+        }
+
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_CHECK_MAILBOXES,
+        check_mailboxes,
+        supports_response=SupportsResponse.OPTIONAL,
+    )
 
     hass.services.async_register(
         DOMAIN,

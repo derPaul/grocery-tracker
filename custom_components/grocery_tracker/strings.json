@@ -67,6 +67,23 @@
       },
       "price": {
         "name": "Price {product}"
+      },
+      "mailbox_last_check": {
+        "name": "Last check"
+      },
+      "mailbox_status": {
+        "name": "Status",
+        "state": {
+          "ok": "OK",
+          "auth_failed": "Login failed",
+          "folder_not_found": "Folder not found",
+          "unreachable": "Not reachable"
+        }
+      }
+    },
+    "button": {
+      "check_mailboxes": {
+        "name": "Check mailboxes"
       }
     }
   },
@@ -118,6 +135,10 @@
           "description": "AI Task entity to use. Defaults to the preferred entity from the AI Task settings."
         }
       }
+    },
+    "check_mailboxes": {
+      "name": "Check mailboxes",
+      "description": "Checks all mailboxes for new eBons now and returns what was found."
     }
   },
   "exceptions": {

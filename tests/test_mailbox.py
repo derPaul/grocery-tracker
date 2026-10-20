@@ -8,11 +8,15 @@ from unittest.mock import patch
 
 import pytest
 
-from custom_components.grocery_tracker.const import DOMAIN, EVENT_RECEIPT_IMPORTED
+from custom_components.grocery_tracker.const import (
+    DOMAIN,
+    EVENT_RECEIPT_IMPORTED,
+    SERVICE_CHECK_MAILBOXES,
+)
 from homeassistant.config_entries import SOURCE_RECONFIGURE, SOURCE_USER
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
-from homeassistant.helpers import issue_registry as ir
+from homeassistant.helpers import entity_registry as er, issue_registry as ir
 
 from .conftest import make_text_pdf
 from .fake_imap import FakeIMAP4SSL, FakeServer, make_mail
@@ -161,3 +165,60 @@ async def test_mailbox_auth_issue_and_reconfigure(
     hass.config_entries.async_remove_subentry(entry, subentry.subentry_id)
     await hass.async_block_till_done(wait_background_tasks=True)
     assert ir.async_get(hass).async_get_issue(DOMAIN, issue_id) is None
+
+
+def _mailbox_entity(hass: HomeAssistant, subentry_id: str, key: str) -> str:
+    entity_id = er.async_get(hass).async_get_entity_id("sensor", DOMAIN, f"{subentry_id}_{key}")
+    assert entity_id is not None
+    return entity_id
+
+
+async def test_check_mailboxes_button_action_and_status(
+    hass: HomeAssistant,
+    inbox: Path,  # noqa: F811
+    server: FakeServer,
+    rewe_ebon_text: str,
+    freezer,
+) -> None:
+    freezer.move_to("2024-03-20 12:00:00+00:00")
+    entry = await _setup(hass, inbox)
+    await _add_mailbox(hass, entry.entry_id)
+    entry = hass.config_entries.async_get_entry(entry.entry_id)
+    (subentry,) = entry.subentries.values()
+    last_check = _mailbox_entity(hass, subentry.subentry_id, "last_check")
+    status = _mailbox_entity(hass, subentry.subentry_id, "status")
+
+    # The first check ran right after setup and found nothing.
+    assert hass.states.get(status).state == "ok"
+    assert hass.states.get(last_check).state == "2024-03-20T12:00:00+00:00"
+    assert hass.states.get(last_check).attributes["new_messages"] == 0
+    entity = er.async_get(hass).async_get(status)
+    assert entity.config_subentry_id == subentry.subentry_id
+
+    # A new eBon arrives; the button checks right away.
+    freezer.move_to("2024-03-20 12:05:00+00:00")
+    server.add(
+        "REWE",
+        10,
+        SENDER,
+        date(2024, 3, 12),
+        make_mail(SENDER, "Dein eBon", date(2024, 3, 12), make_text_pdf(rewe_ebon_text)),
+    )
+    button = er.async_get(hass).async_get_entity_id(
+        "button", DOMAIN, f"{entry.entry_id}_check_mailboxes"
+    )
+    await hass.services.async_call("button", "press", {"entity_id": button}, blocking=True)
+    await hass.async_block_till_done()
+    assert hass.states.get(last_check).state == "2024-03-20T12:05:00+00:00"
+    assert hass.states.get(last_check).attributes["new_receipts"] == 1
+    assert hass.states.get("sensor.grocery_tracker_last_receipt").state == "10.60"
+
+    # The action reports the outcome, here a revoked password.
+    server.password = "revoked"
+    response = await hass.services.async_call(
+        DOMAIN, SERVICE_CHECK_MAILBOXES, {}, blocking=True, return_response=True
+    )
+    assert response["mailboxes"][0]["mailbox"] == "me@gmail.com (REWE)"
+    assert response["mailboxes"][0]["status"] == "auth_failed"
+    await hass.async_block_till_done()
+    assert hass.states.get(status).state == "auth_failed"

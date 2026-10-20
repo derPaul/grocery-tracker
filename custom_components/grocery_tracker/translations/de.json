@@ -67,6 +67,23 @@
       },
       "price": {
         "name": "Preis {product}"
+      },
+      "mailbox_last_check": {
+        "name": "Letzter Abruf"
+      },
+      "mailbox_status": {
+        "name": "Status",
+        "state": {
+          "ok": "OK",
+          "auth_failed": "Anmeldung fehlgeschlagen",
+          "folder_not_found": "Ordner nicht gefunden",
+          "unreachable": "Nicht erreichbar"
+        }
+      }
+    },
+    "button": {
+      "check_mailboxes": {
+        "name": "Postfächer abrufen"
       }
     }
   },
@@ -118,6 +135,10 @@
           "description": "Zu verwendende AI-Task-Entität. Standard ist die bevorzugte Entität aus den AI-Task-Einstellungen."
         }
       }
+    },
+    "check_mailboxes": {
+      "name": "Postfächer abrufen",
+      "description": "Durchsucht alle Postfächer sofort nach neuen eBons und gibt zurück, was gefunden wurde."
     }
   },
   "exceptions": {

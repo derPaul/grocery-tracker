@@ -77,6 +77,24 @@ def local_isoformat(value: datetime) -> str:
     return value.replace(tzinfo=dt_util.get_default_time_zone()).isoformat()
 
 
+MAILBOX_OK = "ok"
+MAILBOX_AUTH_FAILED = "auth_failed"
+MAILBOX_FOLDER_NOT_FOUND = "folder_not_found"
+MAILBOX_UNREACHABLE = "unreachable"
+MAILBOX_STATES = [MAILBOX_OK, MAILBOX_AUTH_FAILED, MAILBOX_FOLDER_NOT_FOUND, MAILBOX_UNREACHABLE]
+
+
+@dataclass(frozen=True, slots=True)
+class MailboxStatus:
+    """Outcome of the last check of a mailbox."""
+
+    last_check: datetime
+    status: str
+    new_messages: int = 0
+    new_receipts: int = 0
+    error: str | None = None
+
+
 @dataclass(frozen=True, slots=True)
 class GroceryStats:
     """Aggregated values exposed as sensors."""
@@ -111,6 +129,7 @@ class GroceryTrackerCoordinator(DataUpdateCoordinator[GroceryStats]):
         self.store = store
         self.inbox = Path(entry.data[CONF_INBOX_PATH])
         self._mail_lock = asyncio.Lock()
+        self.mailbox_status: dict[str, MailboxStatus] = {}
 
     @property
     def watched_products(self) -> list[str]:
@@ -206,18 +225,21 @@ class GroceryTrackerCoordinator(DataUpdateCoordinator[GroceryStats]):
                 shutil.move, path, self.inbox / target_dir / path.name
             )
 
-    def _check_mailbox(self, key: str, config: MailboxConfig) -> int:
-        """Import receipts from new messages; return the number of new receipts.
+    def _check_mailbox(self, key: str, config: MailboxConfig) -> tuple[int, int]:
+        """Import receipts from new messages.
+
+        Return the number of new messages and of newly imported receipts.
 
         Runs in the executor, so events are fired with the thread-safe API.
         """
         uidvalidity, last_uid = self.store.mail_state(key)
-        imported = 0
+        messages = imported = 0
         with Mailbox(config, client_context()) as mailbox:
             if mailbox.uidvalidity != uidvalidity:
                 # UIDs were reassigned by the server: start over, duplicates are skipped.
                 last_uid = 0
             for message in mailbox.messages(after_uid=last_uid):
+                messages += 1
                 for filename, data in message.pdfs:
                     source = f"mail {message.uid}: {filename}"
                     try:
@@ -241,7 +263,7 @@ class GroceryTrackerCoordinator(DataUpdateCoordinator[GroceryStats]):
                     imported += bool(events)
                 # Remember progress per message, so an interruption loses nothing.
                 self.store.set_mail_state(key, mailbox.uidvalidity, message.uid)
-        return imported
+        return messages, imported
 
     def _mailboxes(self) -> list[ConfigSubentry]:
         return [
@@ -250,20 +272,30 @@ class GroceryTrackerCoordinator(DataUpdateCoordinator[GroceryStats]):
             if subentry.subentry_type == SUBENTRY_MAILBOX
         ]
 
-    async def async_check_mailboxes(self) -> None:
-        """Import receipts from all configured mailboxes."""
-        if self._mail_lock.locked():
-            return
+    async def async_check_mailboxes(self) -> dict[str, MailboxStatus]:
+        """Import receipts from all configured mailboxes; return their status.
+
+        A check that is requested while one is running waits for it and then
+        runs again, so it never misses a message that just arrived.
+        """
         async with self._mail_lock:
             imported = 0
             for subentry in self._mailboxes():
                 issue_id = f"mailbox_{subentry.subentry_id}"
                 config = mailbox_config(subentry.data)
+                now = dt_util.now()
                 try:
-                    imported += await self.hass.async_add_executor_job(
+                    messages, receipts = await self.hass.async_add_executor_job(
                         self._check_mailbox, config.search_key, config
                     )
                 except (MailAuthError, MailFolderError) as err:
+                    self.mailbox_status[subentry.subentry_id] = MailboxStatus(
+                        now,
+                        MAILBOX_AUTH_FAILED
+                        if isinstance(err, MailAuthError)
+                        else MAILBOX_FOLDER_NOT_FOUND,
+                        error=str(err),
+                    )
                     _LOGGER.error("Mailbox %s: %s", subentry.title, err)
                     ir.async_create_issue(
                         self.hass,
@@ -284,10 +316,27 @@ class GroceryTrackerCoordinator(DataUpdateCoordinator[GroceryStats]):
                 except MailConnectionError as err:
                     # Temporary (network, server); try again at the next interval.
                     _LOGGER.warning("Mailbox %s not reachable: %s", subentry.title, err)
+                    self.mailbox_status[subentry.subentry_id] = MailboxStatus(
+                        now, MAILBOX_UNREACHABLE, error=str(err)
+                    )
                 else:
+                    _LOGGER.info(
+                        "Mailbox %s checked: %d new messages, %d new receipts",
+                        subentry.title,
+                        messages,
+                        receipts,
+                    )
+                    self.mailbox_status[subentry.subentry_id] = MailboxStatus(
+                        now, MAILBOX_OK, messages, receipts
+                    )
+                    imported += receipts
                     ir.async_delete_issue(self.hass, DOMAIN, issue_id)
             if imported:
                 await self.async_refresh()
+            else:
+                # Only the mailbox status changed.
+                self.async_update_listeners()
+            return dict(self.mailbox_status)
 
     def _compute_stats(self, now: datetime) -> GroceryStats:
         today = now.replace(hour=0, minute=0, second=0, microsecond=0)

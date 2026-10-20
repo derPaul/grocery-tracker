@@ -61,3 +61,5 @@ categorize_products:
         entity:
           filter:
             domain: ai_task
+
+check_mailboxes:

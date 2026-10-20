@@ -51,6 +51,14 @@ Ohne Filter geht auch Ordner `INBOX` – dann aber nur für Mails, die noch im P
 Schlägt die Anmeldung später fehl (z. B. App-Passwort widerrufen), erscheint ein Hinweis unter
 *Einstellungen → Reparaturen*; über „Postfach ändern" trägst du das neue Passwort ein.
 
+**Abruf prüfen und auslösen:** Jedes Postfach hat zwei Diagnose-Sensoren: *Letzter Abruf*
+(Zeitpunkt, Attribute `new_messages`, `new_receipts`, `error`) und *Status* (`ok`,
+`auth_failed`, `folder_not_found`, `unreachable`). Mit dem Button *Postfächer abrufen* oder
+der Aktion `grocery_tracker.check_mailboxes` (liefert das Ergebnis je Postfach zurück) wird
+sofort abgerufen. Im Protokoll steht bei jedem Abruf eine Zeile wie
+`Mailbox … checked: 1 new messages, 1 new receipts` (Log-Level `info` für
+`custom_components.grocery_tracker`).
+
 Andere Anbieter funktionieren genauso (z. B. GMX: `imap.gmx.net`, IMAP muss dort in den
 Einstellungen aktiviert sein). Es können mehrere Postfächer eingerichtet werden. Das Passwort
 wird wie bei der IMAP-Integration von Home Assistant in der Konfiguration gespeichert.

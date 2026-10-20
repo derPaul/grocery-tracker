@@ -51,6 +51,20 @@
       },
       "price": {
         "default": "mdi:tag"
+      },
+      "mailbox_last_check": {
+        "default": "mdi:email-check"
+      },
+      "mailbox_status": {
+        "default": "mdi:email-alert",
+        "state": {
+          "ok": "mdi:email-check"
+        }
+      }
+    },
+    "button": {
+      "check_mailboxes": {
+        "default": "mdi:email-sync"
       }
     }
   },
@@ -66,6 +80,9 @@
     },
     "categorize_products": {
       "service": "mdi:robot"
+    },
+    "check_mailboxes": {
+      "service": "mdi:email-sync"
     }
   }
 }

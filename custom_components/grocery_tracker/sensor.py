@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
+from datetime import datetime
 from decimal import Decimal
 from typing import Any
 
@@ -13,7 +14,7 @@ from homeassistant.components.sensor import (
     SensorEntityDescription,
     SensorStateClass,
 )
-from homeassistant.const import CURRENCY_EURO
+from homeassistant.const import CURRENCY_EURO, EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.device_registry import DeviceEntryType, DeviceInfo
@@ -21,11 +22,13 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .categories import CATEGORIES
-from .const import DOMAIN
+from .const import DOMAIN, SUBENTRY_MAILBOX
 from .coordinator import (
+    MAILBOX_STATES,
     GroceryStats,
     GroceryTrackerConfigEntry,
     GroceryTrackerCoordinator,
+    MailboxStatus,
     local_isoformat,
 )
 
@@ -164,6 +167,15 @@ async def async_setup_entry(
             *(PriceSensor(coordinator, product) for product in watched),
         ]
     )
+    for subentry in entry.subentries.values():
+        if subentry.subentry_type == SUBENTRY_MAILBOX:
+            async_add_entities(
+                [
+                    MailboxSensor(coordinator, subentry.subentry_id, subentry.title, description)
+                    for description in MAILBOX_SENSORS
+                ],
+                config_subentry_id=subentry.subentry_id,
+            )
 
 
 class GrocerySensor(CoordinatorEntity[GroceryTrackerCoordinator], SensorEntity):
@@ -243,4 +255,78 @@ class PriceSensor(CoordinatorEntity[GroceryTrackerCoordinator], SensorEntity):
             "average_price": float(stats.average),
             "purchases": stats.purchases,
             "last_seen": local_isoformat(stats.last_seen),
+        }
+
+
+@dataclass(frozen=True, kw_only=True)
+class MailboxSensorEntityDescription(SensorEntityDescription):
+    """Describes a mailbox sensor."""
+
+    value_fn: Callable[[MailboxStatus], datetime | str]
+
+
+MAILBOX_SENSORS: tuple[MailboxSensorEntityDescription, ...] = (
+    MailboxSensorEntityDescription(
+        key="last_check",
+        translation_key="mailbox_last_check",
+        device_class=SensorDeviceClass.TIMESTAMP,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda status: status.last_check,
+    ),
+    MailboxSensorEntityDescription(
+        key="status",
+        translation_key="mailbox_status",
+        device_class=SensorDeviceClass.ENUM,
+        options=MAILBOX_STATES,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda status: status.status,
+    ),
+)
+
+
+class MailboxSensor(CoordinatorEntity[GroceryTrackerCoordinator], SensorEntity):
+    """Result of the last check of one mailbox."""
+
+    _attr_has_entity_name = True
+    entity_description: MailboxSensorEntityDescription
+
+    def __init__(
+        self,
+        coordinator: GroceryTrackerCoordinator,
+        subentry_id: str,
+        title: str,
+        description: MailboxSensorEntityDescription,
+    ) -> None:
+        """Initialize the sensor."""
+        super().__init__(coordinator)
+        self.entity_description = description
+        self._subentry_id = subentry_id
+        self._attr_unique_id = f"{subentry_id}_{description.key}"
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, subentry_id)},
+            name=title,
+            entry_type=DeviceEntryType.SERVICE,
+            via_device=(DOMAIN, coordinator.config_entry.entry_id),
+        )
+
+    @property
+    def _status(self) -> MailboxStatus | None:
+        return self.coordinator.mailbox_status.get(self._subentry_id)
+
+    @property
+    def native_value(self) -> datetime | str | None:
+        """Return the value; unknown until the first check finished."""
+        if (status := self._status) is None:
+            return None
+        return self.entity_description.value_fn(status)
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any] | None:
+        """Return what the last check found."""
+        if (status := self._status) is None:
+            return None
+        return {
+            "new_messages": status.new_messages,
+            "new_receipts": status.new_receipts,
+            "error": status.error,
         }
