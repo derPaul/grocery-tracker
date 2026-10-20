@@ -1,0 +1,14 @@
+{
+  "entity": {
+    "sensor": {
+      "spending_this_week": { "default": "mdi:cart" },
+      "spending_this_month": { "default": "mdi:cart" },
+      "spending_last_month": { "default": "mdi:cart-outline" },
+      "receipts_this_month": { "default": "mdi:receipt-text" },
+      "last_receipt_total": { "default": "mdi:receipt-text-check" }
+    }
+  },
+  "services": {
+    "import_receipt": { "service": "mdi:receipt-text-plus" }
+  }
+}

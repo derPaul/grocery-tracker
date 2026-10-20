@@ -1,0 +1,63 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "description": "Receipts (e.g. REWE eBon PDFs) placed in the inbox folder are imported automatically.",
+        "data": {
+          "inbox_path": "Inbox folder"
+        }
+      }
+    },
+    "error": {
+      "path_not_absolute": "Please enter an absolute path, e.g. /config/grocery_tracker/inbox."
+    },
+    "abort": {
+      "single_instance_allowed": "Already configured. Only a single configuration possible."
+    }
+  },
+  "entity": {
+    "sensor": {
+      "spending_this_week": {
+        "name": "Spending this week"
+      },
+      "spending_this_month": {
+        "name": "Spending this month"
+      },
+      "spending_last_month": {
+        "name": "Spending last month"
+      },
+      "receipts_this_month": {
+        "name": "Receipts this month"
+      },
+      "last_receipt_total": {
+        "name": "Last receipt"
+      }
+    }
+  },
+  "services": {
+    "import_receipt": {
+      "name": "Import receipt",
+      "description": "Imports a single receipt file (PDF).",
+      "fields": {
+        "path": {
+          "name": "Path",
+          "description": "Absolute path to the receipt file."
+        }
+      }
+    }
+  },
+  "exceptions": {
+    "path_not_allowed": {
+      "message": "Access to {path} is not allowed."
+    },
+    "file_not_found": {
+      "message": "File {path} does not exist."
+    },
+    "not_loaded": {
+      "message": "Grocery Tracker is not set up."
+    },
+    "parse_error": {
+      "message": "Could not parse {path}: {error}"
+    }
+  }
+}

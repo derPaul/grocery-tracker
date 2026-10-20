@@ -1,0 +1,63 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "description": "Quittungen (z. B. REWE-eBon-PDFs), die im Eingangsordner abgelegt werden, werden automatisch importiert.",
+        "data": {
+          "inbox_path": "Eingangsordner"
+        }
+      }
+    },
+    "error": {
+      "path_not_absolute": "Bitte einen absoluten Pfad angeben, z. B. /config/grocery_tracker/inbox."
+    },
+    "abort": {
+      "single_instance_allowed": "Bereits konfiguriert. Nur eine einzige Konfiguration möglich."
+    }
+  },
+  "entity": {
+    "sensor": {
+      "spending_this_week": {
+        "name": "Ausgaben diese Woche"
+      },
+      "spending_this_month": {
+        "name": "Ausgaben diesen Monat"
+      },
+      "spending_last_month": {
+        "name": "Ausgaben letzten Monat"
+      },
+      "receipts_this_month": {
+        "name": "Einkäufe diesen Monat"
+      },
+      "last_receipt_total": {
+        "name": "Letzter Einkauf"
+      }
+    }
+  },
+  "services": {
+    "import_receipt": {
+      "name": "Quittung importieren",
+      "description": "Importiert eine einzelne Quittungsdatei (PDF).",
+      "fields": {
+        "path": {
+          "name": "Pfad",
+          "description": "Absoluter Pfad zur Quittungsdatei."
+        }
+      }
+    }
+  },
+  "exceptions": {
+    "path_not_allowed": {
+      "message": "Zugriff auf {path} ist nicht erlaubt."
+    },
+    "file_not_found": {
+      "message": "Die Datei {path} existiert nicht."
+    },
+    "not_loaded": {
+      "message": "Grocery Tracker ist nicht eingerichtet."
+    },
+    "parse_error": {
+      "message": "{path} konnte nicht gelesen werden: {error}"
+    }
+  }
+}

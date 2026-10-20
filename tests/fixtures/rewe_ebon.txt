@@ -1,0 +1,33 @@
+                               R E W E
+                        REWE Markt GmbH
+                        Musterstr. 12
+                        50667 Köln
+                   UID Nr.: DE812706034
+                                              EUR
+ BIO H-MILCH 1,5%                            1,19 B
+ GOUDA JUNG                                  2,29 B
+ PFAND 0,25 EURO                             0,50 A *
+      2 Stk x    0,25
+ BANANE CHIQUITA                             1,48 B
+      0,994 kg x    1,49 EUR/kg
+ SPUELMITTEL                                 1,95 A
+ MINERALWASSER                               3,54 B
+      6 Stk x    0,59
+ RABATT 10%                                 -0,35 B
+ ----------------------------------------------
+ SUMME                       EUR            10,60
+ ==============================================
+ Geg. EC-Cash                EUR            10,60
+
+ Steuer  %      Netto     Steuer     Brutto
+ A=  19,0%       2,06      0,39       2,45
+ B=   7,0%       7,62      0,53       8,15
+ Gesamtbetrag    9,68      0,92      10,60
+
+ TSE-Signatur:       ABCDEF0123456789
+ TSE-Start:          2024-03-12T18:22:10.000
+ TSE-Stop:           2024-03-12T18:23:45.000
+ 12.03.2024     18:23      Bon-Nr.:4711
+ Markt:1234     Kasse:3    Bed.:123456
+ ****************************************
+ Mit diesem Einkauf hast Du 5 PAYBACK Punkte gesammelt

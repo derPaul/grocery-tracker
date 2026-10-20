@@ -1,0 +1,7 @@
+import_receipt:
+  fields:
+    path:
+      required: true
+      example: "/config/grocery_tracker/ebon.pdf"
+      selector:
+        text:
