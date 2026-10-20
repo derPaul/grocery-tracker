@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime, time, timedelta
 from pathlib import Path
 
 import voluptuous as vol
@@ -20,20 +20,27 @@ from homeassistant.helpers import issue_registry as ir
 import homeassistant.helpers.config_validation as cv
 from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.helpers.typing import ConfigType
+from homeassistant.util import dt as dt_util
 
 from .ai import ai_task_available, async_categorize
 from .categories import CATEGORIES, CategoryResolver
 from .const import (
     ATTR_CATEGORY,
+    ATTR_END,
     ATTR_ENTITY_ID,
+    ATTR_MONTHS,
     ATTR_PATH,
     ATTR_PRODUCT,
+    ATTR_RECEIPTS,
     ATTR_SEARCH,
+    ATTR_START,
+    ATTR_TOP,
     DATABASE_FILE,
     DOMAIN,
     MAIL_SCAN_INTERVAL,
     SERVICE_CATEGORIZE_PRODUCTS,
     SERVICE_CHECK_MAILBOXES,
+    SERVICE_GET_STATISTICS,
     SERVICE_IMPORT_RECEIPT,
     SERVICE_LIST_PRODUCTS,
     SERVICE_SET_CATEGORY,
@@ -64,6 +71,42 @@ SET_CATEGORY_SCHEMA = vol.Schema(
     }
 )
 CATEGORIZE_PRODUCTS_SCHEMA = vol.Schema({vol.Optional(ATTR_ENTITY_ID): cv.entity_id})
+GET_STATISTICS_SCHEMA = vol.Schema(
+    {
+        vol.Exclusive(ATTR_MONTHS, "period"): vol.All(vol.Coerce(int), vol.Range(min=1, max=36)),
+        vol.Exclusive(ATTR_START, "period"): cv.date,
+        vol.Optional(ATTR_END): cv.date,
+        vol.Optional(ATTR_TOP, default=10): vol.All(vol.Coerce(int), vol.Range(min=1, max=100)),
+        vol.Optional(ATTR_RECEIPTS, default=False): cv.boolean,
+    }
+)
+
+MAX_STATISTICS_MONTHS = 36
+
+
+def _month_start(value: date) -> datetime:
+    return datetime(value.year, value.month, 1)
+
+
+def _next_month(value: datetime) -> datetime:
+    return datetime(value.year + value.month // 12, value.month % 12 + 1, 1)
+
+
+def _statistics_period(data: dict) -> tuple[datetime, datetime]:
+    """Return [start, end) for get_statistics: a date range or the last n months."""
+    today = dt_util.now().replace(tzinfo=None).date()
+    end_date = data.get(ATTR_END)
+    if (start_date := data.get(ATTR_START)) is not None:
+        start = datetime.combine(start_date, time())
+        end = datetime.combine((end_date or today) + timedelta(days=1), time())
+    else:
+        end = datetime.combine((end_date or today) + timedelta(days=1), time())
+        start = _month_start((end - timedelta(days=1)).date())
+        for _ in range(data.get(ATTR_MONTHS, 1) - 1):
+            start = _month_start((start - timedelta(days=1)).date())
+    if end <= start:
+        raise ServiceValidationError(translation_domain=DOMAIN, translation_key="invalid_period")
+    return start, end
 
 
 def _category_key(resolver: CategoryResolver, value: str) -> str:
@@ -224,6 +267,71 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
                 if subentry_id in entry.subentries
             ]
         }
+
+    async def get_statistics(call: ServiceCall) -> ServiceResponse:
+        coordinator = _get_coordinator(hass)
+        store = coordinator.store
+        start, end = _statistics_period(call.data)
+
+        def collect() -> dict:
+            months = []
+            month = _month_start(start.date())
+            while month < end and len(months) < MAX_STATISTICS_MONTHS:
+                lo, hi = max(month, start), min(_next_month(month), end)
+                months.append(
+                    {
+                        "month": month.strftime("%Y-%m"),
+                        "amount": float(store.spending_between(lo, hi)),
+                        "receipts": store.receipt_count_between(lo, hi),
+                        "by_category": {
+                            category: float(amount)
+                            for category, amount in store.spending_by_category(lo, hi).items()
+                        },
+                    }
+                )
+                month = _next_month(month)
+            result = {
+                "start": start.date().isoformat(),
+                "end": (end - timedelta(days=1)).date().isoformat(),
+                "total": float(store.spending_between(start, end)),
+                "receipts": store.receipt_count_between(start, end),
+                "by_category": {
+                    category: float(amount)
+                    for category, amount in store.spending_by_category(start, end).items()
+                },
+                "top_products": [
+                    {
+                        "name": product.name,
+                        "category": product.category,
+                        "amount": float(product.amount),
+                        "purchases": product.purchases,
+                    }
+                    for product in store.top_products(start, end, call.data[ATTR_TOP])
+                ],
+                "months": months,
+            }
+            if call.data[ATTR_RECEIPTS]:
+                result["receipt_list"] = [
+                    {
+                        "uid": receipt.uid,
+                        "store": receipt.store,
+                        "timestamp": local_isoformat(receipt.timestamp),
+                        "total": float(receipt.total),
+                        "item_count": receipt.item_count,
+                    }
+                    for receipt in store.receipts_between(start, end)
+                ]
+            return result
+
+        return await hass.async_add_executor_job(collect)
+
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_GET_STATISTICS,
+        get_statistics,
+        schema=GET_STATISTICS_SCHEMA,
+        supports_response=SupportsResponse.ONLY,
+    )
 
     hass.services.async_register(
         DOMAIN,

@@ -65,3 +65,30 @@ categorize_products:
             domain: ai_task
 
 check_mailboxes:
+
+get_statistics:
+  fields:
+    months:
+      example: 3
+      selector:
+        number:
+          min: 1
+          max: 36
+          mode: box
+    start:
+      selector:
+        date:
+    end:
+      selector:
+        date:
+    top:
+      default: 10
+      selector:
+        number:
+          min: 1
+          max: 100
+          mode: box
+    receipts:
+      default: false
+      selector:
+        boolean:

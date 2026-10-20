@@ -15,6 +15,7 @@ from custom_components.grocery_tracker.const import (
     EVENT_PRICE_CHANGED,
     EVENT_RECEIPT_IMPORTED,
     SERVICE_CATEGORIZE_PRODUCTS,
+    SERVICE_GET_STATISTICS,
     SERVICE_IMPORT_RECEIPT,
     SERVICE_LIST_PRODUCTS,
     SERVICE_SET_CATEGORY,
@@ -339,3 +340,58 @@ async def test_year_total_and_monthly_overview(
     assert months[0] == {"month": "2023-04", "amount": 0.0, "receipts": 0}
     assert months[8] == {"month": "2023-12", "amount": 10.6, "receipts": 1}
     assert months[-1] == {"month": "2024-03", "amount": 21.3, "receipts": 2}
+
+
+async def test_get_statistics(
+    hass: HomeAssistant,
+    inbox: Path,
+    rewe_ebon_text: str,
+    rewe_ebon_text_later: str,
+    freezer,
+) -> None:
+    freezer.move_to("2024-03-20 12:00:00")
+    inbox.mkdir(parents=True)
+    (inbox / "1.pdf").write_bytes(make_text_pdf(rewe_ebon_text))
+    (inbox / "2.pdf").write_bytes(make_text_pdf(rewe_ebon_text_later))
+    (inbox / "3.pdf").write_bytes(make_text_pdf(rewe_ebon_text.replace("12.03.2024", "28.01.2024")))
+    await _setup(hass, inbox)
+
+    async def stats(**data):
+        return await hass.services.async_call(
+            DOMAIN, SERVICE_GET_STATISTICS, data, blocking=True, return_response=True
+        )
+
+    # Default: this month
+    response = await stats()
+    assert (response["start"], response["end"]) == ("2024-03-01", "2024-03-20")
+    assert (response["total"], response["receipts"]) == (21.3, 2)
+    assert [m["month"] for m in response["months"]] == ["2024-03"]
+    month = response["months"][0]
+    assert response["by_category"]["dairy_eggs"] == month["by_category"]["dairy_eggs"]
+    assert response["top_products"][0]["purchases"] == 2
+    assert "receipt_list" not in response
+
+    # Three months, per month and in total
+    response = await stats(months=3, top=3, receipts=True)
+    assert response["start"] == "2024-01-01"
+    assert [(m["month"], m["amount"], m["receipts"]) for m in response["months"]] == [
+        ("2024-01", 10.6, 1),
+        ("2024-02", 0.0, 0),
+        ("2024-03", 21.3, 2),
+    ]
+    assert response["total"] == 31.9
+    assert sum(response["by_category"].values()) == pytest.approx(31.9)
+    assert len(response["top_products"]) == 3
+    assert [r["timestamp"][:10] for r in response["receipt_list"]] == [
+        "2024-03-19",
+        "2024-03-12",
+        "2024-01-28",
+    ]
+
+    # Date range
+    response = await stats(start="2024-03-15", end="2024-03-31")
+    assert (response["total"], response["receipts"]) == (10.7, 1)
+    assert [m["month"] for m in response["months"]] == ["2024-03"]
+
+    with pytest.raises(ServiceValidationError):
+        await stats(start="2024-03-15", end="2024-03-01")

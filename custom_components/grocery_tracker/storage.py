@@ -232,6 +232,27 @@ class ReceiptStore:
             ).fetchall()
         return {month: (_euros(cents), count) for month, cents, count in rows}
 
+    def receipts_between(self, start: datetime, end: datetime) -> list[ReceiptSummary]:
+        """Return all receipts in [start, end), newest first."""
+        with self._connect() as conn:
+            rows = conn.execute(
+                "SELECT r.uid, r.store, r.timestamp, r.total_cents, COUNT(i.id)"
+                " FROM receipts r LEFT JOIN items i ON i.receipt_uid = r.uid"
+                " WHERE r.timestamp >= ? AND r.timestamp < ?"
+                " GROUP BY r.uid ORDER BY r.timestamp DESC",
+                (start.isoformat(), end.isoformat()),
+            ).fetchall()
+        return [
+            ReceiptSummary(
+                uid=uid,
+                store=store,
+                timestamp=datetime.fromisoformat(timestamp),
+                total=_euros(total_cents),
+                item_count=item_count,
+            )
+            for uid, store, timestamp, total_cents, item_count in rows
+        ]
+
     def last_receipt(self) -> ReceiptSummary | None:
         """Return the most recent receipt."""
         with self._connect() as conn:

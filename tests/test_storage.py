@@ -148,3 +148,15 @@ def test_monthly_spending(tmp_path: Path, rewe_ebon_text: str, rewe_ebon_text_la
     assert store.monthly_spending(datetime(2024, 1, 1), datetime(2025, 1, 1)) == {
         "2024-03": (Decimal("21.30"), 2),
     }
+
+
+def test_receipts_between(tmp_path: Path, rewe_ebon_text: str, rewe_ebon_text_later: str) -> None:
+    store = ReceiptStore(tmp_path / "db.sqlite")
+    store.setup()
+    store.add_receipt(parse_rewe_ebon(rewe_ebon_text))
+    store.add_receipt(parse_rewe_ebon(rewe_ebon_text_later))
+
+    receipts = store.receipts_between(datetime(2024, 3, 1), datetime(2024, 4, 1))
+    assert [r.timestamp.day for r in receipts] == [19, 12], "newest first"
+    assert (receipts[0].total, receipts[0].item_count) == (Decimal("10.70"), 7)
+    assert store.receipts_between(datetime(2024, 3, 13), datetime(2024, 3, 19)) == []
