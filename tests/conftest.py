@@ -21,6 +21,19 @@ def rewe_ebon_text() -> str:
     return (FIXTURES / "rewe_ebon.txt").read_text(encoding="utf-8")
 
 
+@pytest.fixture
+def rewe_ebon_text_later(rewe_ebon_text: str) -> str:
+    """Return the sample eBon one week later, with more expensive milk."""
+    text = rewe_ebon_text.replace("Bon-Nr.:4711", "Bon-Nr.:4712")
+    text = text.replace("12.03.2024", "19.03.2024")
+    text = text.replace(
+        "BIO H-MILCH 1,5%                            1,19 B",
+        "BIO H-MILCH 1,5%                            1,29 B",
+    )
+    # Keep the receipt consistent: the total grows by 0.10.
+    return text.replace("10,60", "10,70")
+
+
 def make_text_pdf(text: str) -> bytes:
     """Build a minimal one-page PDF that renders the text in a monospace font."""
 

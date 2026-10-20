@@ -10,7 +10,9 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.grocery_tracker.const import (
     CONF_INBOX_PATH,
+    CONF_WATCHED_PRODUCTS,
     DOMAIN,
+    EVENT_PRICE_CHANGED,
     EVENT_RECEIPT_IMPORTED,
     SERVICE_CATEGORIZE_PRODUCTS,
     SERVICE_IMPORT_RECEIPT,
@@ -21,6 +23,7 @@ from homeassistant import config_entries
 from homeassistant.core import HomeAssistant, ServiceCall, SupportsResponse
 from homeassistant.data_entry_flow import FlowResultType
 from homeassistant.exceptions import ServiceValidationError
+from homeassistant.helpers import entity_registry as er
 
 from .conftest import make_text_pdf
 
@@ -129,7 +132,7 @@ async def test_list_products(hass: HomeAssistant, inbox: Path, rewe_ebon_text: s
         "purchases": 1,
         "last_price": 1.49,
         "unit": "kg",
-        "last_seen": "2024-03-12T18:23:00",
+        "last_seen": "2024-03-12T18:23:00-07:00",  # test time zone is US/Pacific
     }
 
     response = await hass.services.async_call(
@@ -227,3 +230,87 @@ async def test_categorize_products(hass: HomeAssistant, inbox: Path, rewe_ebon_t
 async def test_unload(hass: HomeAssistant, inbox: Path) -> None:
     entry = await _setup(hass, inbox)
     assert await hass.config_entries.async_unload(entry.entry_id)
+
+
+async def test_item_attributes(
+    hass: HomeAssistant, inbox: Path, rewe_ebon_text: str, freezer
+) -> None:
+    freezer.move_to("2024-03-20 12:00:00")
+    inbox.mkdir(parents=True)
+    (inbox / "ebon.pdf").write_bytes(make_text_pdf(rewe_ebon_text))
+    await _setup(hass, inbox)
+
+    items = hass.states.get("sensor.grocery_tracker_last_receipt").attributes["items"]
+    assert len(items) == 7
+    assert items[3] == {
+        "name": "BANANE CHIQUITA",
+        "category": "fruit_vegetables",
+        "quantity": 0.994,
+        "unit": "kg",
+        "unit_price": 1.49,
+        "total": 1.48,
+    }
+    top = hass.states.get("sensor.grocery_tracker_spending_this_month").attributes["top_products"]
+    assert top[0] == {
+        "name": "MINERALWASSER",
+        "category": "beverages",
+        "amount": 3.54,
+        "purchases": 1,
+    }
+
+
+async def test_watched_products(
+    hass: HomeAssistant, inbox: Path, rewe_ebon_text: str, rewe_ebon_text_later: str
+) -> None:
+    inbox.mkdir(parents=True)
+    (inbox / "ebon1.pdf").write_bytes(make_text_pdf(rewe_ebon_text))
+    entry = await _setup(hass, inbox)
+
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    assert result["type"] is FlowResultType.FORM
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], {CONF_WATCHED_PRODUCTS: ["BIO H-MILCH 1,5%", "BANANE CHIQUITA"]}
+    )
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    await hass.async_block_till_done()
+
+    milk = "sensor.grocery_tracker_price_bio_h_milch_15"
+    state = hass.states.get(milk)
+    assert state is not None
+    assert state.state == "1.19"
+    assert state.attributes["unit_of_measurement"] == "€"
+    assert state.attributes["previous_price"] is None
+    banana = hass.states.get("sensor.grocery_tracker_price_banane_chiquita")
+    assert banana.state == "1.49"
+    assert banana.attributes["unit_of_measurement"] == "€/kg"
+
+    # A new receipt with a higher milk price updates the sensor and fires an event.
+    events = []
+    hass.bus.async_listen(EVENT_PRICE_CHANGED, events.append)
+    (inbox / "ebon2.pdf").write_bytes(make_text_pdf(rewe_ebon_text_later))
+    await entry.runtime_data.async_refresh()
+    await hass.async_block_till_done()
+
+    state = hass.states.get(milk)
+    assert state.state == "1.29"
+    assert state.attributes["previous_price"] == 1.19
+    assert state.attributes["change_percent"] == 8.4
+    assert [event.data for event in events] == [
+        {
+            "product": "BIO H-MILCH 1,5%",
+            "category": "dairy_eggs",
+            "old_price": 1.19,
+            "new_price": 1.29,
+            "change_percent": 8.4,
+            "unit": "Stk",
+        }
+    ]
+
+    # Unwatching a product removes its sensor.
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], {CONF_WATCHED_PRODUCTS: ["BANANE CHIQUITA"]}
+    )
+    await hass.async_block_till_done()
+    assert er.async_get(hass).async_get(milk) is None
+    assert hass.states.get("sensor.grocery_tracker_price_banane_chiquita") is not None

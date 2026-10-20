@@ -48,6 +48,9 @@
       },
       "spending_this_month_other": {
         "default": "mdi:help-box"
+      },
+      "price": {
+        "default": "mdi:tag"
       }
     }
   },

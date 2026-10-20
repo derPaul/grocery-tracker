@@ -76,6 +76,91 @@ Tipp: Mit einer Automation auf das Event `grocery_tracker_receipt_imported` kann
 | Einkäufe diesen Monat | Anzahl Quittungen |
 | Letzter Einkauf | Betrag der letzten Quittung, Attribute: Markt, Zeitpunkt, Anzahl Positionen |
 | *Warengruppe* diesen Monat | Ausgaben pro Warengruppe seit dem 1. des Monats (ein Sensor je Gruppe) |
+| Preis *Produkt* | Letzter Preis eines beobachteten Produkts (siehe unten) |
+
+Einzelne Artikel bekommen bewusst **keine** eigenen Entitäten. Stattdessen:
+
+- **Letzter Einkauf** hat das Attribut `items` mit allen Positionen (Name, Warengruppe, Menge,
+  Einheit, Stück-/kg-Preis, Betrag).
+- **Ausgaben diesen Monat** hat das Attribut `top_products` mit den 10 Produkten, für die
+  diesen Monat am meisten ausgegeben wurde.
+
+Beide Listen werden nicht in der Recorder-Datenbank gespeichert.
+
+## Beobachtete Produkte und Preisverlauf
+
+Unter *Einstellungen → Geräte & Dienste → Grocery Tracker → Konfigurieren* wählst du Produkte
+aus, deren Preis du verfolgen willst. Jedes bekommt einen Sensor „Preis *Produkt*" mit dem
+letzten Preis (pro Stück bzw. pro kg) und den Attributen `previous_price`, `change_percent`,
+`min_price`, `max_price`, `average_price`, `purchases` und `last_seen`. Der Verlauf in Home
+Assistant beginnt ab dem Zeitpunkt, an dem du das Produkt auswählst.
+
+Bei jedem Import, der den Preis eines Produkts ändert, wird das Event
+`grocery_tracker_price_changed` gefeuert (`product`, `category`, `old_price`, `new_price`,
+`change_percent`, `unit`) – für **alle** Produkte, nicht nur beobachtete.
+
+```yaml
+# Automation: Benachrichtigung bei Preisänderung ab 10 %
+triggers:
+  - trigger: event
+    event_type: grocery_tracker_price_changed
+conditions:
+  - condition: template
+    value_template: "{{ trigger.event.data.change_percent | abs >= 10 }}"
+actions:
+  - action: notify.notify
+    data:
+      message: >
+        {{ trigger.event.data.product }}: {{ trigger.event.data.old_price }} € →
+        {{ trigger.event.data.new_price }} € ({{ trigger.event.data.change_percent }} %)
+```
+
+## Dashboard-Beispiele
+
+Die Entity-IDs können bei dir abweichen – sie stehen unter *Einstellungen → Geräte & Dienste →
+Grocery Tracker → Entitäten*.
+
+**Letzter Einkauf mit allen Positionen** (Markdown-Karte):
+
+```yaml
+type: markdown
+title: Letzter Einkauf
+content: |
+  {% set bon = 'sensor.grocery_tracker_last_receipt' %}
+  **{{ state_attr(bon, 'store') }}** · {{ as_timestamp(state_attr(bon, 'timestamp')) | timestamp_custom('%d.%m.%Y %H:%M') }} · **{{ states(bon) | replace('.', ',') }} €**
+
+  | Artikel | Menge | Preis |
+  |:--|--:|--:|
+  {% for i in state_attr(bon, 'items') or [] -%}
+  | {{ i.name }} | {{ '' if i.total < 0 else (i.quantity | string | replace('.', ',')) ~ ' kg' if i.unit == 'kg' else (i.quantity | int) ~ '×' }} | {{ '%.2f' | format(i.total) | replace('.', ',') }} € |
+  {% endfor %}
+```
+
+**Top-Produkte diesen Monat** (Markdown-Karte):
+
+```yaml
+type: markdown
+title: Top-Produkte diesen Monat
+content: |
+  | Produkt | Käufe | Summe |
+  |:--|--:|--:|
+  {% for p in state_attr('sensor.grocery_tracker_spending_this_month', 'top_products') or [] -%}
+  | {{ p.name }} | {{ p.purchases }} | {{ '%.2f' | format(p.amount) | replace('.', ',') }} € |
+  {% endfor %}
+```
+
+**Preisverlauf beobachteter Produkte** (Statistik-Diagramm):
+
+```yaml
+type: statistics-graph
+title: Preisverlauf
+chart_type: line
+period: day
+stat_types: [mean]
+entities:
+  - sensor.grocery_tracker_price_feine_butter
+  - sensor.grocery_tracker_price_fr_weidemilch
+```
 
 ## Event
 

@@ -8,16 +8,20 @@ from decimal import Decimal
 import logging
 from pathlib import Path
 import shutil
+from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from homeassistant.util import dt as dt_util
 
+from .categories import resolve_category
 from .const import (
     ARCHIVE_DIR,
     CONF_INBOX_PATH,
+    CONF_WATCHED_PRODUCTS,
     DOMAIN,
+    EVENT_PRICE_CHANGED,
     EVENT_RECEIPT_IMPORTED,
     FAILED_DIR,
     SCAN_INTERVAL,
@@ -25,11 +29,22 @@ from .const import (
 from .models import Receipt
 from .parsers import ReceiptParseError, parse_receipt
 from .pdf import extract_text
-from .storage import ReceiptStore, ReceiptSummary
+from .storage import (
+    ItemDetail,
+    PriceStats,
+    ProductSpending,
+    ReceiptStore,
+    ReceiptSummary,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
 type GroceryTrackerConfigEntry = ConfigEntry[GroceryTrackerCoordinator]
+
+
+def local_isoformat(value: datetime) -> str:
+    """Return a receipt time (naive local time) as ISO 8601 with UTC offset."""
+    return value.replace(tzinfo=dt_util.get_default_time_zone()).isoformat()
 
 
 @dataclass(frozen=True, slots=True)
@@ -42,6 +57,9 @@ class GroceryStats:
     receipts_this_month: int
     last_receipt: ReceiptSummary | None
     spending_by_category_this_month: dict[str, Decimal]
+    last_receipt_items: list[ItemDetail]
+    top_products_this_month: list[ProductSpending]
+    prices: dict[str, PriceStats | None]
 
 
 class GroceryTrackerCoordinator(DataUpdateCoordinator[GroceryStats]):
@@ -63,6 +81,11 @@ class GroceryTrackerCoordinator(DataUpdateCoordinator[GroceryStats]):
         self.store = store
         self.inbox = Path(entry.data[CONF_INBOX_PATH])
 
+    @property
+    def watched_products(self) -> list[str]:
+        """Return the products whose price is tracked as a sensor."""
+        return self.config_entry.options.get(CONF_WATCHED_PRODUCTS, [])
+
     def _ensure_dirs(self) -> None:
         for directory in (self.inbox, self.inbox / ARCHIVE_DIR, self.inbox / FAILED_DIR):
             directory.mkdir(parents=True, exist_ok=True)
@@ -72,8 +95,37 @@ class GroceryTrackerCoordinator(DataUpdateCoordinator[GroceryStats]):
         await self.hass.async_add_executor_job(self._ensure_dirs)
         await self.hass.async_add_executor_job(self.store.setup)
 
-    def _import_file(self, path: Path) -> tuple[Receipt, bool]:
-        """Parse and store one file; return the receipt and whether it was new."""
+    def _price_changes(self, receipt: Receipt) -> list[dict[str, Any]]:
+        """Return event data for products whose price changed with this receipt."""
+        assigned = self.store.assigned_categories()
+        changes = []
+        for name in dict.fromkeys(item.name for item in receipt.items if item.total > 0):
+            stats = self.store.price_stats(name)
+            # Skip if an older receipt was imported late, the price is not new then.
+            if (
+                stats is None
+                or stats.previous is None
+                or stats.last == stats.previous
+                or stats.last_seen != receipt.timestamp
+            ):
+                continue
+            changes.append(
+                {
+                    "product": name,
+                    "category": resolve_category(name, assigned),
+                    "old_price": float(stats.previous),
+                    "new_price": float(stats.last),
+                    "change_percent": stats.change_percent,
+                    "unit": stats.unit,
+                }
+            )
+        return changes
+
+    def _import_file(self, path: Path) -> tuple[Receipt, bool, list[dict[str, Any]]]:
+        """Parse and store one file.
+
+        Return the receipt, whether it was new and the price changes it brought.
+        """
         receipt = parse_receipt(extract_text(path))
         if not receipt.is_consistent:
             _LOGGER.warning(
@@ -82,11 +134,15 @@ class GroceryTrackerCoordinator(DataUpdateCoordinator[GroceryStats]):
                 receipt.items_total,
                 receipt.total,
             )
-        return receipt, self.store.add_receipt(receipt, source=path.name)
+        if not self.store.add_receipt(receipt, source=path.name):
+            return receipt, False, []
+        return receipt, True, self._price_changes(receipt)
 
     async def async_import_file(self, path: Path) -> Receipt | None:
         """Import a single receipt file; return the receipt if it was new."""
-        receipt, is_new = await self.hass.async_add_executor_job(self._import_file, path)
+        receipt, is_new, price_changes = await self.hass.async_add_executor_job(
+            self._import_file, path
+        )
         if not is_new:
             _LOGGER.info("%s was already imported, skipping", path.name)
             return None
@@ -98,11 +154,13 @@ class GroceryTrackerCoordinator(DataUpdateCoordinator[GroceryStats]):
             {
                 "uid": receipt.uid,
                 "store": receipt.store,
-                "timestamp": receipt.timestamp.isoformat(),
+                "timestamp": local_isoformat(receipt.timestamp),
                 "total": float(receipt.total),
                 "item_count": len(receipt.items),
             },
         )
+        for change in price_changes:
+            self.hass.bus.async_fire(EVENT_PRICE_CHANGED, change)
         return receipt
 
     def _scan_inbox(self) -> list[Path]:
@@ -129,15 +187,19 @@ class GroceryTrackerCoordinator(DataUpdateCoordinator[GroceryStats]):
         month_start = today.replace(day=1)
         last_month_start = (month_start - timedelta(days=1)).replace(day=1)
         far_future = datetime.max
+        last = self.store.last_receipt()
         return GroceryStats(
             spending_this_week=self.store.spending_between(week_start, far_future),
             spending_this_month=self.store.spending_between(month_start, far_future),
             spending_last_month=self.store.spending_between(last_month_start, month_start),
             receipts_this_month=self.store.receipt_count_between(month_start, far_future),
-            last_receipt=self.store.last_receipt(),
+            last_receipt=last,
             spending_by_category_this_month=self.store.spending_by_category(
                 month_start, far_future
             ),
+            last_receipt_items=self.store.receipt_items(last.uid) if last else [],
+            top_products_this_month=self.store.top_products(month_start, far_future),
+            prices={name: self.store.price_stats(name) for name in self.watched_products},
         )
 
     async def _async_update_data(self) -> GroceryStats:

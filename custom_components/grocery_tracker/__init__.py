@@ -33,7 +33,11 @@ from .const import (
     SERVICE_LIST_PRODUCTS,
     SERVICE_SET_CATEGORY,
 )
-from .coordinator import GroceryTrackerConfigEntry, GroceryTrackerCoordinator
+from .coordinator import (
+    GroceryTrackerConfigEntry,
+    GroceryTrackerCoordinator,
+    local_isoformat,
+)
 from .parsers import ReceiptParseError
 from .storage import ReceiptStore
 
@@ -104,7 +108,7 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
             "imported": True,
             "uid": receipt.uid,
             "store": receipt.store,
-            "timestamp": receipt.timestamp.isoformat(),
+            "timestamp": local_isoformat(receipt.timestamp),
             "total": float(receipt.total),
             "item_count": len(receipt.items),
         }
@@ -129,7 +133,7 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
                 "purchases": product.purchases,
                 "last_price": float(product.last_price),
                 "unit": product.unit,
-                "last_seen": product.last_seen.isoformat(),
+                "last_seen": local_isoformat(product.last_seen),
             }
             for product in products
         ]

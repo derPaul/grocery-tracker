@@ -82,6 +82,59 @@ class ProductSummary:
     last_seen: datetime
 
 
+@dataclass(frozen=True, slots=True)
+class ItemDetail:
+    """One line of a stored receipt."""
+
+    name: str
+    category: str
+    quantity: Decimal
+    unit: str
+    unit_price: Decimal | None
+    total: Decimal
+
+
+@dataclass(frozen=True, slots=True)
+class ProductSpending:
+    """Amount spent on one product in a period."""
+
+    name: str
+    category: str
+    amount: Decimal
+    purchases: int
+
+
+@dataclass(frozen=True, slots=True)
+class PricePoint:
+    """Price per piece / kg of one purchase."""
+
+    timestamp: datetime
+    price: Decimal
+    unit: str
+    receipt_uid: str
+
+
+@dataclass(frozen=True, slots=True)
+class PriceStats:
+    """Price history of a product condensed."""
+
+    last: Decimal
+    previous: Decimal | None
+    minimum: Decimal
+    maximum: Decimal
+    average: Decimal
+    unit: str
+    purchases: int
+    last_seen: datetime
+
+    @property
+    def change_percent(self) -> float | None:
+        """Return the change from the previous to the last price in percent."""
+        if not self.previous:
+            return None
+        return round(float((self.last - self.previous) / self.previous * 100), 1)
+
+
 class ReceiptStore:
     """Persist receipts in a SQLite database."""
 
@@ -258,3 +311,93 @@ class ReceiptStore:
                 prev = (receipt_uid, category)
             cents[category] += total_cents
         return {category: _euros(value) for category, value in cents.items()}
+
+    def receipt_items(self, uid: str) -> list[ItemDetail]:
+        """Return the lines of a receipt; discounts get the category of the item above."""
+        assigned = self.assigned_categories()
+        with self._connect() as conn:
+            rows = conn.execute(
+                "SELECT name, quantity, unit, unit_price_cents, total_cents FROM items"
+                " WHERE receipt_uid = ? ORDER BY position",
+                (uid,),
+            ).fetchall()
+        items: list[ItemDetail] = []
+        for name, quantity, unit, unit_price_cents, total_cents in rows:
+            if total_cents < 0:
+                category = items[-1].category if items else OTHER
+            else:
+                category = resolve_category(name, assigned)
+            items.append(
+                ItemDetail(
+                    name=name,
+                    category=category,
+                    quantity=Decimal(quantity),
+                    unit=unit,
+                    unit_price=None if unit_price_cents is None else _euros(unit_price_cents),
+                    total=_euros(total_cents),
+                )
+            )
+        return items
+
+    def top_products(
+        self, start: datetime, end: datetime, limit: int = 10
+    ) -> list[ProductSpending]:
+        """Return the products with the highest spending in [start, end)."""
+        assigned = self.assigned_categories()
+        with self._connect() as conn:
+            rows = conn.execute(
+                "SELECT i.name, SUM(i.total_cents) AS cents, COUNT(*)"
+                " FROM items i JOIN receipts r ON r.uid = i.receipt_uid"
+                " WHERE r.timestamp >= ? AND r.timestamp < ? AND i.total_cents > 0"
+                " GROUP BY i.name ORDER BY cents DESC, i.name LIMIT ?",
+                (start.isoformat(), end.isoformat(), limit),
+            ).fetchall()
+        return [
+            ProductSpending(
+                name=name,
+                category=resolve_category(name, assigned),
+                amount=_euros(cents),
+                purchases=purchases,
+            )
+            for name, cents, purchases in rows
+        ]
+
+    def price_history(self, name: str) -> list[PricePoint]:
+        """Return the price per piece / kg of every purchase, oldest first."""
+        with self._connect() as conn:
+            rows = conn.execute(
+                "SELECT r.timestamp, COALESCE(i.unit_price_cents, i.total_cents), i.unit, r.uid"
+                " FROM items i JOIN receipts r ON r.uid = i.receipt_uid"
+                " WHERE i.name = ? AND i.total_cents > 0"
+                " ORDER BY r.timestamp, i.position",
+                (name,),
+            ).fetchall()
+        return [
+            PricePoint(
+                timestamp=datetime.fromisoformat(timestamp),
+                price=_euros(cents),
+                unit=unit,
+                receipt_uid=uid,
+            )
+            for timestamp, cents, unit, uid in rows
+        ]
+
+    def price_stats(self, name: str) -> PriceStats | None:
+        """Return the condensed price history of a product."""
+        if not (history := self.price_history(name)):
+            return None
+        last = history[-1]
+        # The previous price is the one from an earlier receipt, not a second
+        # line of the same receipt.
+        earlier = [point for point in history if point.receipt_uid != last.receipt_uid]
+        prices = [point.price for point in history]
+        return PriceStats(
+            last=last.price,
+            previous=earlier[-1].price if earlier else None,
+            minimum=min(prices),
+            maximum=max(prices),
+            average=(sum(prices) / len(prices)).quantize(Decimal("0.01")),
+            unit=last.unit,
+            purchases=len(history),
+            last_seen=last.timestamp,
+        )

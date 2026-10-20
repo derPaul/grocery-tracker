@@ -64,6 +64,9 @@
       },
       "spending_this_month_other": {
         "name": "Sonstiges diesen Monat"
+      },
+      "price": {
+        "name": "Preis {product}"
       }
     }
   },
@@ -152,6 +155,20 @@
         "deposit": "Pfand",
         "other": "Sonstiges"
       }
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Beobachtete Produkte",
+        "description": "Jedes ausgewählte Produkt bekommt einen Sensor mit dem letzten Preis (pro Stück bzw. pro kg) und dem Preisverlauf als Attribute.",
+        "data": {
+          "watched_products": "Produkte"
+        }
+      }
+    },
+    "abort": {
+      "not_loaded": "Grocery Tracker ist nicht geladen."
     }
   }
 }

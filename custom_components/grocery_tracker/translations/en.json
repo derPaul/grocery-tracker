@@ -64,6 +64,9 @@
       },
       "spending_this_month_other": {
         "name": "Other this month"
+      },
+      "price": {
+        "name": "Price {product}"
       }
     }
   },
@@ -152,6 +155,20 @@
         "deposit": "Deposit",
         "other": "Other"
       }
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Watched products",
+        "description": "Each selected product gets a sensor with its latest price (per piece or per kg) and its price history as attributes.",
+        "data": {
+          "watched_products": "Products"
+        }
+      }
+    },
+    "abort": {
+      "not_loaded": "Grocery Tracker is not loaded."
     }
   }
 }

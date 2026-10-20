@@ -6,6 +6,7 @@ from typing import Final
 DOMAIN: Final = "grocery_tracker"
 
 CONF_INBOX_PATH: Final = "inbox_path"
+CONF_WATCHED_PRODUCTS: Final = "watched_products"
 
 DEFAULT_INBOX_DIR: Final = "grocery_tracker/inbox"
 DATABASE_FILE: Final = "grocery_tracker.db"
@@ -25,3 +26,4 @@ ATTR_CATEGORY: Final = "category"
 ATTR_ENTITY_ID: Final = "entity_id"
 
 EVENT_RECEIPT_IMPORTED: Final = f"{DOMAIN}_receipt_imported"
+EVENT_PRICE_CHANGED: Final = f"{DOMAIN}_price_changed"
