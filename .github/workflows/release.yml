@@ -1,8 +1,11 @@
 name: Release
 
+# Either push a v* tag, or start the workflow manually: it then releases the
+# version from manifest.json and creates the tag itself.
 on:
   push:
     tags: ["v*"]
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -17,13 +20,14 @@ jobs:
         with:
           python-version: "3.13"
 
-      - name: Check tag matches manifest version
+      - name: Determine tag
         run: |
           version=$(jq -r .version custom_components/grocery_tracker/manifest.json)
-          if [ "v${version}" != "${GITHUB_REF_NAME}" ]; then
+          if [ "${GITHUB_REF_TYPE}" = "tag" ] && [ "v${version}" != "${GITHUB_REF_NAME}" ]; then
             echo "Tag ${GITHUB_REF_NAME} does not match manifest version ${version}"
             exit 1
           fi
+          echo "TAG=v${version}" >> "${GITHUB_ENV}"
 
       - name: Run tests
         run: |
@@ -40,5 +44,5 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "${GITHUB_REF_NAME}" grocery_tracker.zip \
-            --title "${GITHUB_REF_NAME}" --generate-notes
+          gh release create "${TAG}" grocery_tracker.zip \
+            --target "${GITHUB_SHA}" --title "${TAG}" --generate-notes
