@@ -25,6 +25,9 @@ data:
   path: /config/grocery_tracker/ebon.pdf
 ```
 
+Bereits importierte Quittungen (gleicher Markt, gleiche Uhrzeit, gleiche Bon-Nr.) werden
+erkannt und nicht doppelt gezählt.
+
 ## Produkte auflisten
 
 Die Aktion `grocery_tracker.list_products` liefert alle gekauften Produkte mit Anzahl Käufe,
@@ -36,9 +39,6 @@ action: grocery_tracker.list_products
 data:
   search: milch
 ```
-
-Bereits importierte Quittungen (gleicher Markt, gleiche Uhrzeit, gleiche Bon-Nr.) werden
-erkannt und nicht doppelt gezählt.
 
 ## Sensoren
 
