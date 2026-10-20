@@ -86,6 +86,9 @@
       },
       "receipts_total": {
         "name": "Einkäufe gesamt"
+      },
+      "spending_this_month_custom": {
+        "name": "{category} diesen Monat"
       }
     },
     "button": {
@@ -166,6 +169,9 @@
     },
     "ai_task_unavailable": {
       "message": "AI Task ist nicht eingerichtet. Richte zuerst eine KI-Integration ein (z. B. Ollama, OpenAI, Google Gemini)."
+    },
+    "unknown_category": {
+      "message": "Unbekannte Warengruppe „{category}“. Möglich: {categories}."
     }
   },
   "selector": {
@@ -249,6 +255,47 @@
       "abort": {
         "already_configured": "Dieser Postfach-Ordner ist bereits eingerichtet.",
         "reconfigure_successful": "Postfach aktualisiert."
+      }
+    },
+    "category": {
+      "entry_type": "Warengruppe",
+      "initiate_flow": {
+        "user": "Warengruppe hinzufügen",
+        "reconfigure": "Warengruppe ändern"
+      },
+      "step": {
+        "user": {
+          "title": "Warengruppe",
+          "description": "Produkte kommen in diese Warengruppe über Stichwörter im Namen auf dem Bon, über die KI („Produkte per KI einordnen“) oder manuell („Warengruppe setzen“). Stichwörter haben Vorrang vor KI und eingebauten Regeln, eine manuelle Zuordnung hat immer Vorrang.",
+          "data": {
+            "name": "Name",
+            "keywords": "Stichwörter",
+            "description": "Beschreibung für die KI"
+          },
+          "data_description": {
+            "keywords": "Durch Komma getrennt, z. B. WINDEL, HIPP, BABY. Trifft irgendwo im Produktnamen; Umlaute wie auf dem Bon (UE) oder als ü.",
+            "description": "Optional: was in diese Gruppe gehört, z. B. „Babynahrung, Windeln, Pflegeprodukte für Babys“."
+          }
+        },
+        "reconfigure": {
+          "title": "Warengruppe ändern",
+          "description": "Beim Umbenennen bleiben alle Zuordnungen erhalten.",
+          "data": {
+            "name": "Name",
+            "keywords": "Stichwörter",
+            "description": "Beschreibung für die KI"
+          },
+          "data_description": {
+            "keywords": "Durch Komma getrennt, z. B. WINDEL, HIPP, BABY."
+          }
+        }
+      },
+      "error": {
+        "name_exists": "Eine Warengruppe mit diesem Namen gibt es schon.",
+        "invalid_name": "Bitte einen Namen mit Buchstaben oder Ziffern eingeben."
+      },
+      "abort": {
+        "reconfigure_successful": "Warengruppe aktualisiert."
       }
     }
   },

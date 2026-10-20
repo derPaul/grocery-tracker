@@ -22,7 +22,7 @@ from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.helpers.typing import ConfigType
 
 from .ai import ai_task_available, async_categorize
-from .categories import CATEGORIES, OTHER, resolve_category
+from .categories import CATEGORIES, CategoryResolver
 from .const import (
     ATTR_CATEGORY,
     ATTR_ENTITY_ID,
@@ -54,16 +54,30 @@ IMPORT_RECEIPT_SCHEMA = vol.Schema({vol.Required(ATTR_PATH): cv.string})
 LIST_PRODUCTS_SCHEMA = vol.Schema(
     {
         vol.Optional(ATTR_SEARCH): cv.string,
-        vol.Optional(ATTR_CATEGORY): vol.In(CATEGORIES),
+        vol.Optional(ATTR_CATEGORY): cv.string,
     }
 )
 SET_CATEGORY_SCHEMA = vol.Schema(
     {
         vol.Required(ATTR_PRODUCT): cv.string,
-        vol.Required(ATTR_CATEGORY): vol.In(CATEGORIES),
+        vol.Required(ATTR_CATEGORY): cv.string,
     }
 )
 CATEGORIZE_PRODUCTS_SCHEMA = vol.Schema({vol.Optional(ATTR_ENTITY_ID): cv.entity_id})
+
+
+def _category_key(resolver: CategoryResolver, value: str) -> str:
+    """Return the key for a category key or custom category name."""
+    if (key := resolver.lookup(value)) is None:
+        raise ServiceValidationError(
+            translation_domain=DOMAIN,
+            translation_key="unknown_category",
+            translation_placeholders={
+                "category": value,
+                "categories": ", ".join([*CATEGORIES, *(c.name for c in resolver.custom)]),
+            },
+        )
+    return key
 
 
 @callback
@@ -130,11 +144,11 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
         coordinator = _get_coordinator(hass)
         store = coordinator.store
         products = await hass.async_add_executor_job(store.products, call.data.get(ATTR_SEARCH))
-        assigned = await hass.async_add_executor_job(store.assigned_categories)
+        resolver = await hass.async_add_executor_job(store.resolver)
         result = [
             {
                 "name": product.name,
-                "category": resolve_category(product.name, assigned),
+                "category": resolver.resolve(product.name),
                 "purchases": product.purchases,
                 "last_price": float(product.last_price),
                 "unit": product.unit,
@@ -142,8 +156,9 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
             }
             for product in products
         ]
-        if (category := call.data.get(ATTR_CATEGORY)) is not None:
-            result = [product for product in result if product["category"] == category]
+        if (value := call.data.get(ATTR_CATEGORY)) is not None:
+            key = _category_key(resolver, value)
+            result = [product for product in result if product["category"] == key]
         return {"products": result}
 
     hass.services.async_register(
@@ -163,9 +178,9 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
                 translation_key="unknown_product",
                 translation_placeholders={"product": product},
             )
-        await hass.async_add_executor_job(
-            coordinator.store.set_category, product, call.data[ATTR_CATEGORY], "manual"
-        )
+        resolver = await hass.async_add_executor_job(coordinator.store.resolver)
+        key = _category_key(resolver, call.data[ATTR_CATEGORY])
+        await hass.async_add_executor_job(coordinator.store.set_category, product, key, "manual")
         await coordinator.async_request_refresh()
 
     hass.services.async_register(
@@ -180,14 +195,10 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
             )
         store = coordinator.store
         products = await hass.async_add_executor_job(store.products)
-        assigned = await hass.async_add_executor_job(store.assigned_categories)
+        resolver = await hass.async_add_executor_job(store.resolver)
         # Only products no rule knows and that were never categorized before.
-        unknown = [
-            product.name
-            for product in products
-            if product.name not in assigned and resolve_category(product.name, {}) == OTHER
-        ]
-        categorized = await async_categorize(hass, unknown, call.data.get(ATTR_ENTITY_ID))
+        unknown = [product.name for product in products if resolver.is_unknown(product.name)]
+        categorized = await async_categorize(hass, unknown, resolver, call.data.get(ATTR_ENTITY_ID))
         for name, category in categorized.items():
             await hass.async_add_executor_job(store.set_category, name, category, "ai")
         await coordinator.async_request_refresh()

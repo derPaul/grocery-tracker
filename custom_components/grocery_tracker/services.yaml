@@ -16,6 +16,7 @@ list_products:
       selector:
         select:
           translation_key: category
+          custom_value: true
           options:
             - fruit_vegetables
             - dairy_eggs
@@ -41,6 +42,7 @@ set_category:
       selector:
         select:
           translation_key: category
+          custom_value: true
           options:
             - fruit_vegetables
             - dairy_eggs

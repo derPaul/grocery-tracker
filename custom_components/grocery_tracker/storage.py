@@ -15,7 +15,7 @@ from decimal import Decimal
 from pathlib import Path
 import sqlite3
 
-from .categories import CATEGORIES, OTHER, resolve_category
+from .categories import OTHER, CategoryResolver, CustomCategory
 from .models import Receipt
 
 SCHEMA = """
@@ -146,6 +146,7 @@ class ReceiptStore:
     def __init__(self, path: Path | str) -> None:
         """Initialize the store; call ``setup`` before use."""
         self._path = str(path)
+        self.custom_categories: list[CustomCategory] = []
 
     @contextmanager
     def _connect(self) -> Iterator[sqlite3.Connection]:
@@ -314,6 +315,16 @@ class ReceiptStore:
         with self._connect() as conn:
             return dict(conn.execute("SELECT name, category FROM product_categories"))
 
+    def resolver(self) -> CategoryResolver:
+        """Return a resolver with the stored assignments and custom categories."""
+        with self._connect() as conn:
+            rows = conn.execute("SELECT name, category, source FROM product_categories").fetchall()
+        return CategoryResolver(
+            self.custom_categories,
+            manual={name: category for name, category, source in rows if source == "manual"},
+            ai={name: category for name, category, source in rows if source != "manual"},
+        )
+
     def set_category(self, name: str, category: str, source: str) -> None:
         """Store the category of a product; ``source`` is "manual" or "ai"."""
         with self._connect() as conn:
@@ -327,7 +338,7 @@ class ReceiptStore:
 
         Discount lines belong to the item printed right above them.
         """
-        assigned = self.assigned_categories()
+        resolver = self.resolver()
         with self._connect() as conn:
             rows = conn.execute(
                 "SELECT i.receipt_uid, i.name, i.total_cents"
@@ -336,7 +347,7 @@ class ReceiptStore:
                 " ORDER BY r.timestamp, i.receipt_uid, i.position",
                 (start.isoformat(), end.isoformat()),
             ).fetchall()
-        cents = dict.fromkeys(CATEGORIES, 0)
+        cents = dict.fromkeys(resolver.keys, 0)
         prev: tuple[str, str] | None = None  # (receipt uid, category) of the last item
         for receipt_uid, name, total_cents in rows:
             if total_cents < 0 and prev is not None and prev[0] == receipt_uid:
@@ -344,14 +355,14 @@ class ReceiptStore:
             elif total_cents < 0:
                 category = OTHER
             else:
-                category = resolve_category(name, assigned)
+                category = resolver.resolve(name)
                 prev = (receipt_uid, category)
             cents[category] += total_cents
         return {category: _euros(value) for category, value in cents.items()}
 
     def receipt_items(self, uid: str) -> list[ItemDetail]:
         """Return the lines of a receipt; discounts get the category of the item above."""
-        assigned = self.assigned_categories()
+        resolver = self.resolver()
         with self._connect() as conn:
             rows = conn.execute(
                 "SELECT name, quantity, unit, unit_price_cents, total_cents FROM items"
@@ -363,7 +374,7 @@ class ReceiptStore:
             if total_cents < 0:
                 category = items[-1].category if items else OTHER
             else:
-                category = resolve_category(name, assigned)
+                category = resolver.resolve(name)
             items.append(
                 ItemDetail(
                     name=name,
@@ -380,7 +391,7 @@ class ReceiptStore:
         self, start: datetime, end: datetime, limit: int = 10
     ) -> list[ProductSpending]:
         """Return the products with the highest spending in [start, end)."""
-        assigned = self.assigned_categories()
+        resolver = self.resolver()
         with self._connect() as conn:
             rows = conn.execute(
                 "SELECT i.name, SUM(i.total_cents) AS cents, COUNT(*)"
@@ -392,7 +403,7 @@ class ReceiptStore:
         return [
             ProductSpending(
                 name=name,
-                category=resolve_category(name, assigned),
+                category=resolver.resolve(name),
                 amount=_euros(cents),
                 purchases=purchases,
             )

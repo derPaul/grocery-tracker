@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
@@ -14,7 +14,7 @@ from homeassistant.components.sensor import (
     SensorEntityDescription,
     SensorStateClass,
 )
-from homeassistant.const import CURRENCY_EURO, EntityCategory
+from homeassistant.const import CONF_NAME, CURRENCY_EURO, EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.device_registry import DeviceEntryType, DeviceInfo
@@ -22,7 +22,7 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .categories import CATEGORIES
-from .const import DOMAIN, SUBENTRY_MAILBOX
+from .const import CONF_KEY, DOMAIN, SUBENTRY_CATEGORY, SUBENTRY_MAILBOX
 from .coordinator import (
     MAILBOX_STATES,
     GroceryStats,
@@ -195,6 +195,24 @@ async def async_setup_entry(
                 ],
                 config_subentry_id=subentry.subentry_id,
             )
+        elif subentry.subentry_type == SUBENTRY_CATEGORY:
+            async_add_entities(
+                [GrocerySensor(coordinator, _custom_category_description(subentry.data))],
+                config_subentry_id=subentry.subentry_id,
+            )
+
+
+def _custom_category_description(data: Mapping[str, Any]) -> GrocerySensorEntityDescription:
+    key = data[CONF_KEY]
+    return GrocerySensorEntityDescription(
+        key=f"spending_this_month_{key}",
+        translation_key="spending_this_month_custom",
+        translation_placeholders={"category": data[CONF_NAME]},
+        device_class=SensorDeviceClass.MONETARY,
+        native_unit_of_measurement=CURRENCY_EURO,
+        suggested_display_precision=2,
+        value_fn=lambda s: s.spending_by_category_this_month.get(key, Decimal("0.00")),
+    )
 
 
 class GrocerySensor(CoordinatorEntity[GroceryTrackerCoordinator], SensorEntity):

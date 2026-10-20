@@ -66,6 +66,9 @@
       },
       "receipts_total": {
         "default": "mdi:receipt-text-outline"
+      },
+      "spending_this_month_custom": {
+        "default": "mdi:tag"
       }
     },
     "button": {

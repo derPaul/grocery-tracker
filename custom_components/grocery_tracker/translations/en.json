@@ -86,6 +86,9 @@
       },
       "receipts_total": {
         "name": "Receipts total"
+      },
+      "spending_this_month_custom": {
+        "name": "{category} this month"
       }
     },
     "button": {
@@ -166,6 +169,9 @@
     },
     "ai_task_unavailable": {
       "message": "AI Task is not set up. Add an AI integration (e.g. Ollama, OpenAI, Google Gemini) first."
+    },
+    "unknown_category": {
+      "message": "Unknown category \"{category}\". Possible: {categories}."
     }
   },
   "selector": {
@@ -249,6 +255,47 @@
       "abort": {
         "already_configured": "This mailbox folder is already set up.",
         "reconfigure_successful": "Mailbox updated."
+      }
+    },
+    "category": {
+      "entry_type": "Category",
+      "initiate_flow": {
+        "user": "Add category",
+        "reconfigure": "Change category"
+      },
+      "step": {
+        "user": {
+          "title": "Category",
+          "description": "Products are assigned to this category by keywords in their receipt name, by the AI (Categorize products with AI) or manually (Set category). Keywords win over AI and built-in rules; a manual assignment always wins.",
+          "data": {
+            "name": "Name",
+            "keywords": "Keywords",
+            "description": "Description for the AI"
+          },
+          "data_description": {
+            "keywords": "Comma separated, e.g. WINDEL, HIPP, BABY. Matched anywhere in the product name; umlauts may be written as on the receipt (UE) or as ü.",
+            "description": "Optional: what belongs in this category, e.g. \"baby food, diapers, care products for babies\"."
+          }
+        },
+        "reconfigure": {
+          "title": "Change category",
+          "description": "Renaming keeps all assignments.",
+          "data": {
+            "name": "Name",
+            "keywords": "Keywords",
+            "description": "Description for the AI"
+          },
+          "data_description": {
+            "keywords": "Comma separated, e.g. WINDEL, HIPP, BABY."
+          }
+        }
+      },
+      "error": {
+        "name_exists": "A category with this name already exists.",
+        "invalid_name": "Please enter a name with letters or digits."
+      },
+      "abort": {
+        "reconfigure_successful": "Category updated."
       }
     }
   },

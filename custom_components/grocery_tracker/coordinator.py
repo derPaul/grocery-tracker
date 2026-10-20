@@ -13,18 +13,20 @@ import shutil
 from typing import Any
 
 from homeassistant.config_entries import ConfigEntry, ConfigSubentry
-from homeassistant.const import CONF_PASSWORD, CONF_PORT, CONF_USERNAME
+from homeassistant.const import CONF_DESCRIPTION, CONF_NAME, CONF_PASSWORD, CONF_PORT, CONF_USERNAME
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from homeassistant.util import dt as dt_util
 from homeassistant.util.ssl import client_context
 
-from .categories import resolve_category
+from .categories import CustomCategory, parse_keywords
 from .const import (
     ARCHIVE_DIR,
     CONF_FOLDER,
     CONF_INBOX_PATH,
+    CONF_KEY,
+    CONF_KEYWORDS,
     CONF_SENDER,
     CONF_SERVER,
     CONF_SINCE,
@@ -34,6 +36,7 @@ from .const import (
     EVENT_RECEIPT_IMPORTED,
     FAILED_DIR,
     SCAN_INTERVAL,
+    SUBENTRY_CATEGORY,
     SUBENTRY_MAILBOX,
 )
 from .mail import (
@@ -57,6 +60,20 @@ from .storage import (
 _LOGGER = logging.getLogger(__name__)
 
 type GroceryTrackerConfigEntry = ConfigEntry[GroceryTrackerCoordinator]
+
+
+def custom_categories(entry: ConfigEntry) -> list[CustomCategory]:
+    """Return the categories the user added as subentries."""
+    return [
+        CustomCategory(
+            key=subentry.data[CONF_KEY],
+            name=subentry.data[CONF_NAME],
+            keywords=parse_keywords(subentry.data.get(CONF_KEYWORDS, "")),
+            description=subentry.data.get(CONF_DESCRIPTION, ""),
+        )
+        for subentry in entry.subentries.values()
+        if subentry.subentry_type == SUBENTRY_CATEGORY
+    ]
 
 
 def mailbox_config(data: Mapping[str, Any]) -> MailboxConfig:
@@ -137,6 +154,7 @@ class GroceryTrackerCoordinator(DataUpdateCoordinator[GroceryStats]):
             update_interval=SCAN_INTERVAL,
         )
         self.store = store
+        store.custom_categories = custom_categories(entry)
         self.inbox = Path(entry.data[CONF_INBOX_PATH])
         self._mail_lock = asyncio.Lock()
         self.mailbox_status: dict[str, MailboxStatus] = {}
@@ -157,7 +175,7 @@ class GroceryTrackerCoordinator(DataUpdateCoordinator[GroceryStats]):
 
     def _price_changes(self, receipt: Receipt) -> list[dict[str, Any]]:
         """Return event data for products whose price changed with this receipt."""
-        assigned = self.store.assigned_categories()
+        resolver = self.store.resolver()
         changes = []
         for name in dict.fromkeys(item.name for item in receipt.items if item.total > 0):
             stats = self.store.price_stats(name)
@@ -172,7 +190,7 @@ class GroceryTrackerCoordinator(DataUpdateCoordinator[GroceryStats]):
             changes.append(
                 {
                     "product": name,
-                    "category": resolve_category(name, assigned),
+                    "category": resolver.resolve(name),
                     "old_price": float(stats.previous),
                     "new_price": float(stats.last),
                     "change_percent": stats.change_percent,

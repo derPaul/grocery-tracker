@@ -6,10 +6,14 @@ first matching keyword wins, so more specific keywords must come first
 (e.g. "KOKOSMILCH" before "MILCH", "CHIPS" before "LINSEN").
 
 Rules are not stored in the database: improving them re-categorizes past
-purchases too. Manual and AI assignments are stored and take precedence.
+purchases too. Manual and AI assignments are stored; see CategoryResolver for
+the order in which assignments, custom categories and rules apply.
 """
 
 from __future__ import annotations
+
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
 
 FRUIT_VEGETABLES = "fruit_vegetables"
 DAIRY_EGGS = "dairy_eggs"
@@ -169,6 +173,92 @@ def categorize(name: str) -> str | None:
     return None
 
 
-def resolve_category(name: str, assigned: dict[str, str]) -> str:
-    """Return the stored (manual / AI) category, else the rule, else OTHER."""
-    return assigned.get(name) or categorize(name) or OTHER
+@dataclass(frozen=True, slots=True)
+class CustomCategory:
+    """A category added by the user."""
+
+    key: str
+    name: str
+    keywords: tuple[str, ...] = ()
+    description: str = ""
+
+
+def normalize_keyword(text: str) -> str:
+    """Spell a keyword the way receipts print it: upper case, umlauts as AE/OE/UE."""
+    text = text.strip().upper()
+    for umlaut, replacement in (("Ä", "AE"), ("Ö", "OE"), ("Ü", "UE"), ("ẞ", "SS"), ("ß", "SS")):
+        text = text.replace(umlaut, replacement)
+    return text
+
+
+def parse_keywords(text: str) -> tuple[str, ...]:
+    """Split a comma separated keyword list."""
+    return tuple(kw for part in text.split(",") if (kw := normalize_keyword(part)))
+
+
+class CategoryResolver:
+    """Decide the category of a product name.
+
+    Order: manual assignment, keywords of custom categories, AI assignment,
+    built-in keyword rules, OTHER. Assignments to categories that no longer
+    exist (a removed custom category) are ignored.
+    """
+
+    def __init__(
+        self,
+        custom: Sequence[CustomCategory] = (),
+        manual: Mapping[str, str] | None = None,
+        ai: Mapping[str, str] | None = None,
+    ) -> None:
+        """Initialize the resolver."""
+        self.custom = tuple(custom)
+        self.keys: tuple[str, ...] = (*CATEGORIES, *(category.key for category in self.custom))
+        self._manual = manual or {}
+        self._ai = ai or {}
+
+    def _custom_rule(self, name: str) -> str | None:
+        upper = name.upper()
+        for category in self.custom:
+            if any(keyword in upper for keyword in category.keywords):
+                return category.key
+        return None
+
+    def resolve(self, name: str) -> str:
+        """Return the category key of a product."""
+        if (category := self._manual.get(name)) in self.keys:
+            return category
+        if (category := self._custom_rule(name)) is not None:
+            return category
+        if (category := self._ai.get(name)) in self.keys:
+            return category
+        return categorize(name) or OTHER
+
+    def is_unknown(self, name: str) -> bool:
+        """Return True if nothing but the fallback OTHER applies to a product."""
+        return (
+            self._manual.get(name) not in self.keys
+            and self._ai.get(name) not in self.keys
+            and self._custom_rule(name) is None
+            and categorize(name) is None
+        )
+
+    def lookup(self, value: str) -> str | None:
+        """Return the key for a category key or custom category name, else None."""
+        if value in self.keys:
+            return value
+        folded = value.strip().casefold()
+        for category in self.custom:
+            if category.name.casefold() == folded:
+                return category.key
+        return None
+
+    def descriptions(self) -> dict[str, str]:
+        """Return a description per category key, for the AI prompt."""
+        return {
+            **CATEGORY_DESCRIPTIONS,
+            **{
+                category.key: category.description
+                or ", ".join([category.name, *category.keywords]).title()
+                for category in self.custom
+            },
+        }

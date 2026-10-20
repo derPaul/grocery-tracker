@@ -80,14 +80,25 @@ data:
 
 Jedes Produkt wird einer Warengruppe zugeordnet: Obst & Gemüse, Milchprodukte & Eier,
 Brot & Backwaren, Fleisch/Fisch & Alternativen, Vorrat, Tiefkühl, Süßes & Snacks, Getränke,
-Drogerie & Haushalt, Pfand und Sonstiges. Die Zuordnung erfolgt in dieser Reihenfolge:
+Drogerie & Haushalt, Pfand und Sonstiges – plus beliebig viele **eigene Warengruppen**.
+Die Zuordnung erfolgt in dieser Reihenfolge:
 
 1. **Manuell** per Aktion `grocery_tracker.set_category` – hat immer Vorrang.
-2. **KI** per Aktion `grocery_tracker.categorize_products` – nutzt die
+2. **Stichwörter eigener Warengruppen** (siehe unten).
+3. **KI** per Aktion `grocery_tracker.categorize_products` – nutzt die
    [AI-Task-Integration](https://www.home-assistant.io/integrations/ai_task/) (z. B. mit
    Ollama, OpenAI oder Google Gemini) für alle Produkte, die keine Regel kennt. Jedes Produkt
-   wird nur einmal angefragt. Läuft nur, wenn du die Aktion startest.
-3. **Regeln** nach Stichwörtern im Produktnamen (`categories.py`).
+   wird nur einmal angefragt. Läuft nur, wenn du die Aktion startest. Eigene Warengruppen
+   kennt die KI auch.
+4. **Eingebaute Regeln** nach Stichwörtern im Produktnamen (`categories.py`).
+
+**Eigene Warengruppen** legst du unter *Einstellungen → Geräte & Dienste → Grocery Tracker →
+Warengruppe hinzufügen* an: Name, optional Stichwörter (durch Komma getrennt, z. B.
+`WINDEL, HIPP`; Umlaute als `UE` wie auf dem Bon oder als `ü`) und optional eine Beschreibung
+für die KI. Jede eigene Gruppe bekommt einen Sensor „*Name* diesen Monat". Beim Umbenennen
+bleiben Zuordnungen erhalten; wird eine Gruppe gelöscht, fallen ihre Produkte auf die übrigen
+Regeln zurück. In `set_category` und `list_products` kannst du eigene Gruppen über ihren
+Namen ansprechen.
 
 Rabattzeilen zählen zur Warengruppe des Produkts direkt darüber.
 
@@ -95,7 +106,7 @@ Rabattzeilen zählen zur Warengruppe des Produkts direkt darüber.
 action: grocery_tracker.set_category
 data:
   product: GEM PFAN TOSKANA
-  category: frozen
+  category: frozen   # oder der Name einer eigenen Warengruppe, z. B. "Baby"
 ```
 
 Tipp: Mit einer Automation auf das Event `grocery_tracker_receipt_imported` kannst du

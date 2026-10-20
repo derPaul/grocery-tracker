@@ -15,8 +15,10 @@ from custom_components.grocery_tracker.categories import (
     OTHER,
     PANTRY,
     SNACKS_SWEETS,
+    CategoryResolver,
+    CustomCategory,
     categorize,
-    resolve_category,
+    parse_keywords,
 )
 
 
@@ -55,8 +57,48 @@ def test_rules(name: str, category: str) -> None:
 
 def test_unknown() -> None:
     assert categorize("JAP. CLASSIC") is None
-    assert resolve_category("JAP. CLASSIC", {}) == OTHER
+    resolver = CategoryResolver()
+    assert resolver.resolve("JAP. CLASSIC") == OTHER
+    assert resolver.is_unknown("JAP. CLASSIC")
+    assert not resolver.is_unknown("MINI WIENER")
 
 
-def test_assigned_category_wins() -> None:
-    assert resolve_category("MINI WIENER", {"MINI WIENER": SNACKS_SWEETS}) == SNACKS_SWEETS
+BABY = CustomCategory(
+    key="custom_baby",
+    name="Baby",
+    keywords=parse_keywords("windel, Hipp, Brei für"),
+    description="",
+)
+
+
+def test_keywords_are_normalized() -> None:
+    assert BABY.keywords == ("WINDEL", "HIPP", "BREI FUER")
+
+
+def test_resolution_order() -> None:
+    resolver = CategoryResolver(
+        [BABY],
+        manual={"HIPP APFEL": SNACKS_SWEETS},
+        ai={"WINDELN GR.4": FRUIT_VEGETABLES, "JAP. CLASSIC": SNACKS_SWEETS, "ALT": "custom_gone"},
+    )
+    # Manual beats everything.
+    assert resolver.resolve("HIPP APFEL") == SNACKS_SWEETS
+    # Custom keywords beat AI and built-in rules ("APFEL" would be fruit).
+    assert resolver.resolve("WINDELN GR.4") == "custom_baby"
+    assert resolver.resolve("HIPP BIRNE") == "custom_baby"
+    # AI beats the fallback.
+    assert resolver.resolve("JAP. CLASSIC") == SNACKS_SWEETS
+    # Assignments to removed categories are ignored.
+    assert resolver.resolve("ALT") == OTHER
+    assert resolver.is_unknown("ALT")
+    assert not resolver.is_unknown("HIPP BIRNE")
+
+
+def test_lookup_and_descriptions() -> None:
+    resolver = CategoryResolver([BABY])
+    assert resolver.keys[-1] == "custom_baby"
+    assert resolver.lookup("dairy_eggs") == DAIRY_EGGS
+    assert resolver.lookup("custom_baby") == "custom_baby"
+    assert resolver.lookup(" baby ") == "custom_baby"
+    assert resolver.lookup("Kaffee") is None
+    assert resolver.descriptions()["custom_baby"] == "Baby, Windel, Hipp, Brei Fuer"

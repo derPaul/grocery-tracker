@@ -6,7 +6,7 @@ from typing import Any
 
 from homeassistant.core import HomeAssistant
 
-from .categories import CATEGORIES, CATEGORY_DESCRIPTIONS
+from .categories import CategoryResolver
 
 AI_TASK_DOMAIN = "ai_task"
 AI_TASK_SERVICE = "generate_data"
@@ -30,15 +30,20 @@ def ai_task_available(hass: HomeAssistant) -> bool:
 
 
 async def async_categorize(
-    hass: HomeAssistant, names: list[str], entity_id: str | None = None
+    hass: HomeAssistant,
+    names: list[str],
+    resolver: CategoryResolver,
+    entity_id: str | None = None,
 ) -> dict[str, str]:
     """Ask the AI for the category of each product name.
 
     Uses the given AI Task entity, or the preferred one from the AI Task
     settings. Names the AI returns no valid category for are left out.
     """
+    descriptions = resolver.descriptions()
+    categories = list(resolver.keys)
     instructions = INSTRUCTIONS.format(
-        categories="\n".join(f"- {key}: {CATEGORY_DESCRIPTIONS[key]}" for key in CATEGORIES)
+        categories="\n".join(f"- {key}: {descriptions[key]}" for key in categories)
     )
     result: dict[str, str] = {}
     for offset in range(0, len(names), BATCH_SIZE):
@@ -49,7 +54,7 @@ async def async_categorize(
             f"p{index}": {
                 "description": name,
                 "required": True,
-                "selector": {"select": {"options": list(CATEGORIES)}},
+                "selector": {"select": {"options": categories}},
             }
             for index, name in enumerate(batch)
         }
@@ -65,6 +70,6 @@ async def async_categorize(
         )
         answer = (response or {}).get("data") or {}
         for index, name in enumerate(batch):
-            if (category := answer.get(f"p{index}")) in CATEGORIES:
+            if (category := answer.get(f"p{index}")) in categories:
                 result[name] = category
     return result
