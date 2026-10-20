@@ -31,6 +31,39 @@
       },
       "last_receipt_total": {
         "name": "Letzter Einkauf"
+      },
+      "spending_this_month_fruit_vegetables": {
+        "name": "Obst & Gemüse diesen Monat"
+      },
+      "spending_this_month_dairy_eggs": {
+        "name": "Milchprodukte & Eier diesen Monat"
+      },
+      "spending_this_month_bakery": {
+        "name": "Brot & Backwaren diesen Monat"
+      },
+      "spending_this_month_meat_fish": {
+        "name": "Fleisch, Fisch & Alternativen diesen Monat"
+      },
+      "spending_this_month_pantry": {
+        "name": "Vorrat diesen Monat"
+      },
+      "spending_this_month_frozen": {
+        "name": "Tiefkühl diesen Monat"
+      },
+      "spending_this_month_snacks_sweets": {
+        "name": "Süßes & Snacks diesen Monat"
+      },
+      "spending_this_month_beverages": {
+        "name": "Getränke diesen Monat"
+      },
+      "spending_this_month_drugstore_household": {
+        "name": "Drogerie & Haushalt diesen Monat"
+      },
+      "spending_this_month_deposit": {
+        "name": "Pfand diesen Monat"
+      },
+      "spending_this_month_other": {
+        "name": "Sonstiges diesen Monat"
       }
     }
   },
@@ -47,11 +80,39 @@
     },
     "list_products": {
       "name": "Produkte auflisten",
-      "description": "Listet alle gekauften Produkte mit Anzahl Käufe und letztem Preis (pro Stück bzw. kg).",
+      "description": "Listet alle gekauften Produkte mit Warengruppe, Anzahl Käufe und letztem Preis (pro Stück bzw. kg).",
       "fields": {
         "search": {
           "name": "Suche",
           "description": "Nur Produkte auflisten, deren Name diesen Text enthält."
+        },
+        "category": {
+          "name": "Warengruppe",
+          "description": "Nur Produkte dieser Warengruppe auflisten."
+        }
+      }
+    },
+    "set_category": {
+      "name": "Warengruppe setzen",
+      "description": "Ordnet ein Produkt einer Warengruppe zu. Hat Vorrang vor Regeln und KI.",
+      "fields": {
+        "product": {
+          "name": "Produkt",
+          "description": "Produktname genau wie auf dem Bon."
+        },
+        "category": {
+          "name": "Warengruppe",
+          "description": "Neue Warengruppe."
+        }
+      }
+    },
+    "categorize_products": {
+      "name": "Produkte per KI einordnen",
+      "description": "Ordnet mit AI Task alle Produkte ein, die keine Regel erkennt und die noch keine Warengruppe haben.",
+      "fields": {
+        "entity_id": {
+          "name": "AI-Task-Entität",
+          "description": "Zu verwendende AI-Task-Entität. Standard ist die bevorzugte Entität aus den AI-Task-Einstellungen."
         }
       }
     }
@@ -68,6 +129,29 @@
     },
     "parse_error": {
       "message": "{path} konnte nicht gelesen werden: {error}"
+    },
+    "unknown_product": {
+      "message": "Ein Produkt namens \"{product}\" wurde noch nie gekauft."
+    },
+    "ai_task_unavailable": {
+      "message": "AI Task ist nicht eingerichtet. Richte zuerst eine KI-Integration ein (z. B. Ollama, OpenAI, Google Gemini)."
+    }
+  },
+  "selector": {
+    "category": {
+      "options": {
+        "fruit_vegetables": "Obst & Gemüse",
+        "dairy_eggs": "Milchprodukte & Eier",
+        "bakery": "Brot & Backwaren",
+        "meat_fish": "Fleisch, Fisch & Alternativen",
+        "pantry": "Vorrat",
+        "frozen": "Tiefkühl",
+        "snacks_sweets": "Süßes & Snacks",
+        "beverages": "Getränke",
+        "drugstore_household": "Drogerie & Haushalt",
+        "deposit": "Pfand",
+        "other": "Sonstiges"
+      }
     }
   }
 }

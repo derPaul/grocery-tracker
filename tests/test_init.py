@@ -12,11 +12,13 @@ from custom_components.grocery_tracker.const import (
     CONF_INBOX_PATH,
     DOMAIN,
     EVENT_RECEIPT_IMPORTED,
+    SERVICE_CATEGORIZE_PRODUCTS,
     SERVICE_IMPORT_RECEIPT,
     SERVICE_LIST_PRODUCTS,
+    SERVICE_SET_CATEGORY,
 )
 from homeassistant import config_entries
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, ServiceCall, SupportsResponse
 from homeassistant.data_entry_flow import FlowResultType
 from homeassistant.exceptions import ServiceValidationError
 
@@ -123,6 +125,7 @@ async def test_list_products(hass: HomeAssistant, inbox: Path, rewe_ebon_text: s
     assert len(response["products"]) == 6
     assert response["products"][0] == {
         "name": "BANANE CHIQUITA",
+        "category": "fruit_vegetables",
         "purchases": 1,
         "last_price": 1.49,
         "unit": "kg",
@@ -133,6 +136,92 @@ async def test_list_products(hass: HomeAssistant, inbox: Path, rewe_ebon_text: s
         DOMAIN, SERVICE_LIST_PRODUCTS, {"search": "wasser"}, blocking=True, return_response=True
     )
     assert [p["name"] for p in response["products"]] == ["MINERALWASSER"]
+
+    response = await hass.services.async_call(
+        DOMAIN,
+        SERVICE_LIST_PRODUCTS,
+        {"category": "dairy_eggs"},
+        blocking=True,
+        return_response=True,
+    )
+    assert [p["name"] for p in response["products"]] == ["BIO H-MILCH 1,5%", "GOUDA JUNG"]
+
+
+async def test_category_sensors_and_set_category(
+    hass: HomeAssistant, inbox: Path, rewe_ebon_text: str, freezer
+) -> None:
+    freezer.move_to("2024-03-20 12:00:00")
+    inbox.mkdir(parents=True)
+    (inbox / "ebon.pdf").write_bytes(make_text_pdf(rewe_ebon_text))
+    await _setup(hass, inbox)
+
+    dairy = "sensor.grocery_tracker_dairy_eggs_this_month"
+    assert hass.states.get(dairy).state == "3.48"
+    assert hass.states.get("sensor.grocery_tracker_beverages_this_month").state == "3.19"
+    assert hass.states.get("sensor.grocery_tracker_other_this_month").state == "0.00"
+
+    await hass.services.async_call(
+        DOMAIN,
+        SERVICE_SET_CATEGORY,
+        {"product": "GOUDA JUNG", "category": "other"},
+        blocking=True,
+    )
+    await hass.async_block_till_done()
+    assert hass.states.get(dairy).state == "1.19"
+    assert hass.states.get("sensor.grocery_tracker_other_this_month").state == "2.29"
+
+    with pytest.raises(ServiceValidationError) as exc_info:
+        await hass.services.async_call(
+            DOMAIN,
+            SERVICE_SET_CATEGORY,
+            {"product": "GOUDA", "category": "other"},
+            blocking=True,
+        )
+    assert exc_info.value.translation_key == "unknown_product"
+
+
+async def test_categorize_products(hass: HomeAssistant, inbox: Path, rewe_ebon_text: str) -> None:
+    inbox.mkdir(parents=True)
+    text = rewe_ebon_text.replace("SPUELMITTEL", "GEM PFAN TOSKANA")
+    (inbox / "ebon.pdf").write_bytes(make_text_pdf(text))
+    await _setup(hass, inbox)
+
+    with pytest.raises(ServiceValidationError) as exc_info:
+        await hass.services.async_call(
+            DOMAIN, SERVICE_CATEGORIZE_PRODUCTS, {}, blocking=True, return_response=True
+        )
+    assert exc_info.value.translation_key == "ai_task_unavailable"
+
+    calls: list[ServiceCall] = []
+
+    async def generate_data(call: ServiceCall) -> dict:
+        calls.append(call)
+        return {"conversation_id": "1", "data": dict.fromkeys(call.data["structure"], "frozen")}
+
+    hass.services.async_register(
+        "ai_task", "generate_data", generate_data, supports_response=SupportsResponse.ONLY
+    )
+
+    response = await hass.services.async_call(
+        DOMAIN, SERVICE_CATEGORIZE_PRODUCTS, {}, blocking=True, return_response=True
+    )
+
+    assert response == {"categorized": {"GEM PFAN TOSKANA": "frozen"}, "uncategorized": []}
+    # Only the product no rule knows is sent to the AI.
+    (call,) = calls
+    assert [field["description"] for field in call.data["structure"].values()] == [
+        "GEM PFAN TOSKANA"
+    ]
+    products = await hass.services.async_call(
+        DOMAIN, SERVICE_LIST_PRODUCTS, {"search": "PFAN"}, blocking=True, return_response=True
+    )
+    assert products["products"][0]["category"] == "frozen"
+
+    # Already categorized products are not sent again.
+    await hass.services.async_call(
+        DOMAIN, SERVICE_CATEGORIZE_PRODUCTS, {}, blocking=True, return_response=True
+    )
+    assert len(calls) == 1
 
 
 async def test_unload(hass: HomeAssistant, inbox: Path) -> None:

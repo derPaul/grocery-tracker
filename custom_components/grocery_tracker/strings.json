@@ -31,6 +31,39 @@
       },
       "last_receipt_total": {
         "name": "Last receipt"
+      },
+      "spending_this_month_fruit_vegetables": {
+        "name": "Fruit & vegetables this month"
+      },
+      "spending_this_month_dairy_eggs": {
+        "name": "Dairy & eggs this month"
+      },
+      "spending_this_month_bakery": {
+        "name": "Bread & bakery this month"
+      },
+      "spending_this_month_meat_fish": {
+        "name": "Meat, fish & alternatives this month"
+      },
+      "spending_this_month_pantry": {
+        "name": "Pantry this month"
+      },
+      "spending_this_month_frozen": {
+        "name": "Frozen this month"
+      },
+      "spending_this_month_snacks_sweets": {
+        "name": "Sweets & snacks this month"
+      },
+      "spending_this_month_beverages": {
+        "name": "Beverages this month"
+      },
+      "spending_this_month_drugstore_household": {
+        "name": "Drugstore & household this month"
+      },
+      "spending_this_month_deposit": {
+        "name": "Deposit this month"
+      },
+      "spending_this_month_other": {
+        "name": "Other this month"
       }
     }
   },
@@ -47,11 +80,39 @@
     },
     "list_products": {
       "name": "List products",
-      "description": "Lists all purchased products with number of purchases and latest price (per piece or kg).",
+      "description": "Lists all purchased products with category, number of purchases and latest price (per piece or kg).",
       "fields": {
         "search": {
           "name": "Search",
           "description": "Only list products whose name contains this text."
+        },
+        "category": {
+          "name": "Category",
+          "description": "Only list products of this category."
+        }
+      }
+    },
+    "set_category": {
+      "name": "Set category",
+      "description": "Assigns a product to a category. Overrides rules and AI.",
+      "fields": {
+        "product": {
+          "name": "Product",
+          "description": "Product name exactly as on the receipt."
+        },
+        "category": {
+          "name": "Category",
+          "description": "New category."
+        }
+      }
+    },
+    "categorize_products": {
+      "name": "Categorize products with AI",
+      "description": "Uses AI Task to categorize all products that no rule recognizes and that have no category yet.",
+      "fields": {
+        "entity_id": {
+          "name": "AI Task entity",
+          "description": "AI Task entity to use. Defaults to the preferred entity from the AI Task settings."
         }
       }
     }
@@ -68,6 +129,29 @@
     },
     "parse_error": {
       "message": "Could not parse {path}: {error}"
+    },
+    "unknown_product": {
+      "message": "No product named \"{product}\" has been bought yet."
+    },
+    "ai_task_unavailable": {
+      "message": "AI Task is not set up. Add an AI integration (e.g. Ollama, OpenAI, Google Gemini) first."
+    }
+  },
+  "selector": {
+    "category": {
+      "options": {
+        "fruit_vegetables": "Fruit & vegetables",
+        "dairy_eggs": "Dairy & eggs",
+        "bakery": "Bread & bakery",
+        "meat_fish": "Meat, fish & alternatives",
+        "pantry": "Pantry",
+        "frozen": "Frozen",
+        "snacks_sweets": "Sweets & snacks",
+        "beverages": "Beverages",
+        "drugstore_household": "Drugstore & household",
+        "deposit": "Deposit",
+        "other": "Other"
+      }
     }
   }
 }

@@ -41,6 +41,7 @@ class GroceryStats:
     spending_last_month: Decimal
     receipts_this_month: int
     last_receipt: ReceiptSummary | None
+    spending_by_category_this_month: dict[str, Decimal]
 
 
 class GroceryTrackerCoordinator(DataUpdateCoordinator[GroceryStats]):
@@ -134,6 +135,9 @@ class GroceryTrackerCoordinator(DataUpdateCoordinator[GroceryStats]):
             spending_last_month=self.store.spending_between(last_month_start, month_start),
             receipts_this_month=self.store.receipt_count_between(month_start, far_future),
             last_receipt=self.store.last_receipt(),
+            spending_by_category_this_month=self.store.spending_by_category(
+                month_start, far_future
+            ),
         )
 
     async def _async_update_data(self) -> GroceryStats:

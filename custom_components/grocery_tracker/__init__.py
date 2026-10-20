@@ -18,13 +18,20 @@ from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 import homeassistant.helpers.config_validation as cv
 from homeassistant.helpers.typing import ConfigType
 
+from .ai import ai_task_available, async_categorize
+from .categories import CATEGORIES, OTHER, resolve_category
 from .const import (
+    ATTR_CATEGORY,
+    ATTR_ENTITY_ID,
     ATTR_PATH,
+    ATTR_PRODUCT,
     ATTR_SEARCH,
     DATABASE_FILE,
     DOMAIN,
+    SERVICE_CATEGORIZE_PRODUCTS,
     SERVICE_IMPORT_RECEIPT,
     SERVICE_LIST_PRODUCTS,
+    SERVICE_SET_CATEGORY,
 )
 from .coordinator import GroceryTrackerConfigEntry, GroceryTrackerCoordinator
 from .parsers import ReceiptParseError
@@ -35,7 +42,19 @@ PLATFORMS: list[Platform] = [Platform.SENSOR]
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
 IMPORT_RECEIPT_SCHEMA = vol.Schema({vol.Required(ATTR_PATH): cv.string})
-LIST_PRODUCTS_SCHEMA = vol.Schema({vol.Optional(ATTR_SEARCH): cv.string})
+LIST_PRODUCTS_SCHEMA = vol.Schema(
+    {
+        vol.Optional(ATTR_SEARCH): cv.string,
+        vol.Optional(ATTR_CATEGORY): vol.In(CATEGORIES),
+    }
+)
+SET_CATEGORY_SCHEMA = vol.Schema(
+    {
+        vol.Required(ATTR_PRODUCT): cv.string,
+        vol.Required(ATTR_CATEGORY): vol.In(CATEGORIES),
+    }
+)
+CATEGORIZE_PRODUCTS_SCHEMA = vol.Schema({vol.Optional(ATTR_ENTITY_ID): cv.entity_id})
 
 
 @callback
@@ -100,21 +119,23 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
 
     async def list_products(call: ServiceCall) -> ServiceResponse:
         coordinator = _get_coordinator(hass)
-        products = await hass.async_add_executor_job(
-            coordinator.store.products, call.data.get(ATTR_SEARCH)
-        )
-        return {
-            "products": [
-                {
-                    "name": product.name,
-                    "purchases": product.purchases,
-                    "last_price": float(product.last_price),
-                    "unit": product.unit,
-                    "last_seen": product.last_seen.isoformat(),
-                }
-                for product in products
-            ]
-        }
+        store = coordinator.store
+        products = await hass.async_add_executor_job(store.products, call.data.get(ATTR_SEARCH))
+        assigned = await hass.async_add_executor_job(store.assigned_categories)
+        result = [
+            {
+                "name": product.name,
+                "category": resolve_category(product.name, assigned),
+                "purchases": product.purchases,
+                "last_price": float(product.last_price),
+                "unit": product.unit,
+                "last_seen": product.last_seen.isoformat(),
+            }
+            for product in products
+        ]
+        if (category := call.data.get(ATTR_CATEGORY)) is not None:
+            result = [product for product in result if product["category"] == category]
+        return {"products": result}
 
     hass.services.async_register(
         DOMAIN,
@@ -122,6 +143,56 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
         list_products,
         schema=LIST_PRODUCTS_SCHEMA,
         supports_response=SupportsResponse.ONLY,
+    )
+
+    async def set_category(call: ServiceCall) -> None:
+        coordinator = _get_coordinator(hass)
+        product = call.data[ATTR_PRODUCT]
+        if not await hass.async_add_executor_job(coordinator.store.has_product, product):
+            raise ServiceValidationError(
+                translation_domain=DOMAIN,
+                translation_key="unknown_product",
+                translation_placeholders={"product": product},
+            )
+        await hass.async_add_executor_job(
+            coordinator.store.set_category, product, call.data[ATTR_CATEGORY], "manual"
+        )
+        await coordinator.async_request_refresh()
+
+    hass.services.async_register(
+        DOMAIN, SERVICE_SET_CATEGORY, set_category, schema=SET_CATEGORY_SCHEMA
+    )
+
+    async def categorize_products(call: ServiceCall) -> ServiceResponse:
+        coordinator = _get_coordinator(hass)
+        if not ai_task_available(hass):
+            raise ServiceValidationError(
+                translation_domain=DOMAIN, translation_key="ai_task_unavailable"
+            )
+        store = coordinator.store
+        products = await hass.async_add_executor_job(store.products)
+        assigned = await hass.async_add_executor_job(store.assigned_categories)
+        # Only products no rule knows and that were never categorized before.
+        unknown = [
+            product.name
+            for product in products
+            if product.name not in assigned and resolve_category(product.name, {}) == OTHER
+        ]
+        categorized = await async_categorize(hass, unknown, call.data.get(ATTR_ENTITY_ID))
+        for name, category in categorized.items():
+            await hass.async_add_executor_job(store.set_category, name, category, "ai")
+        await coordinator.async_request_refresh()
+        return {
+            "categorized": categorized,
+            "uncategorized": [name for name in unknown if name not in categorized],
+        }
+
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_CATEGORIZE_PRODUCTS,
+        categorize_products,
+        schema=CATEGORIZE_PRODUCTS_SCHEMA,
+        supports_response=SupportsResponse.OPTIONAL,
     )
     return True
 

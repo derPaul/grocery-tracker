@@ -15,6 +15,7 @@ from decimal import Decimal
 from pathlib import Path
 import sqlite3
 
+from .categories import CATEGORIES, OTHER, resolve_category
 from .models import Receipt
 
 SCHEMA = """
@@ -43,6 +44,11 @@ CREATE TABLE IF NOT EXISTS items (
 );
 CREATE INDEX IF NOT EXISTS idx_items_receipt ON items(receipt_uid);
 CREATE INDEX IF NOT EXISTS idx_items_name ON items(name);
+CREATE TABLE IF NOT EXISTS product_categories (
+    name TEXT PRIMARY KEY,
+    category TEXT NOT NULL,
+    source TEXT NOT NULL
+);
 """
 
 
@@ -204,3 +210,51 @@ class ReceiptStore:
             )
             for name, purchases, price_cents, unit, timestamp in rows
         ]
+
+    def has_product(self, name: str) -> bool:
+        """Return True if a product with exactly this name was ever bought."""
+        with self._connect() as conn:
+            return (
+                conn.execute("SELECT 1 FROM items WHERE name = ? LIMIT 1", (name,)).fetchone()
+                is not None
+            )
+
+    def assigned_categories(self) -> dict[str, str]:
+        """Return the stored (manual or AI) category per product name."""
+        with self._connect() as conn:
+            return dict(conn.execute("SELECT name, category FROM product_categories"))
+
+    def set_category(self, name: str, category: str, source: str) -> None:
+        """Store the category of a product; ``source`` is "manual" or "ai"."""
+        with self._connect() as conn:
+            conn.execute(
+                "INSERT OR REPLACE INTO product_categories VALUES (?, ?, ?)",
+                (name, category, source),
+            )
+
+    def spending_by_category(self, start: datetime, end: datetime) -> dict[str, Decimal]:
+        """Return the amount spent per category in [start, end).
+
+        Discount lines belong to the item printed right above them.
+        """
+        assigned = self.assigned_categories()
+        with self._connect() as conn:
+            rows = conn.execute(
+                "SELECT i.receipt_uid, i.name, i.total_cents"
+                " FROM items i JOIN receipts r ON r.uid = i.receipt_uid"
+                " WHERE r.timestamp >= ? AND r.timestamp < ?"
+                " ORDER BY r.timestamp, i.receipt_uid, i.position",
+                (start.isoformat(), end.isoformat()),
+            ).fetchall()
+        cents = dict.fromkeys(CATEGORIES, 0)
+        prev: tuple[str, str] | None = None  # (receipt uid, category) of the last item
+        for receipt_uid, name, total_cents in rows:
+            if total_cents < 0 and prev is not None and prev[0] == receipt_uid:
+                category = prev[1]
+            elif total_cents < 0:
+                category = OTHER
+            else:
+                category = resolve_category(name, assigned)
+                prev = (receipt_uid, category)
+            cents[category] += total_cents
+        return {category: _euros(value) for category, value in cents.items()}

@@ -30,15 +30,41 @@ erkannt und nicht doppelt gezählt.
 
 ## Produkte auflisten
 
-Die Aktion `grocery_tracker.list_products` liefert alle gekauften Produkte mit Anzahl Käufe,
-letztem Preis (pro Stück bzw. pro kg) und Datum des letzten Kaufs. Optional filtert `search`
-nach einem Teil des Namens. Am einfachsten unter *Entwicklerwerkzeuge → Aktionen* ausführen.
+Die Aktion `grocery_tracker.list_products` liefert alle gekauften Produkte mit Warengruppe,
+Anzahl Käufe, letztem Preis (pro Stück bzw. pro kg) und Datum des letzten Kaufs. Optional
+filtert `search` nach einem Teil des Namens und `category` nach Warengruppe – z. B.
+`category: other` für alle noch nicht eingeordneten Produkte. Am einfachsten unter *Entwicklerwerkzeuge → Aktionen* ausführen.
 
 ```yaml
 action: grocery_tracker.list_products
 data:
   search: milch
 ```
+
+## Warengruppen
+
+Jedes Produkt wird einer Warengruppe zugeordnet: Obst & Gemüse, Milchprodukte & Eier,
+Brot & Backwaren, Fleisch/Fisch & Alternativen, Vorrat, Tiefkühl, Süßes & Snacks, Getränke,
+Drogerie & Haushalt, Pfand und Sonstiges. Die Zuordnung erfolgt in dieser Reihenfolge:
+
+1. **Manuell** per Aktion `grocery_tracker.set_category` – hat immer Vorrang.
+2. **KI** per Aktion `grocery_tracker.categorize_products` – nutzt die
+   [AI-Task-Integration](https://www.home-assistant.io/integrations/ai_task/) (z. B. mit
+   Ollama, OpenAI oder Google Gemini) für alle Produkte, die keine Regel kennt. Jedes Produkt
+   wird nur einmal angefragt. Läuft nur, wenn du die Aktion startest.
+3. **Regeln** nach Stichwörtern im Produktnamen (`categories.py`).
+
+Rabattzeilen zählen zur Warengruppe des Produkts direkt darüber.
+
+```yaml
+action: grocery_tracker.set_category
+data:
+  product: GEM PFAN TOSKANA
+  category: frozen
+```
+
+Tipp: Mit einer Automation auf das Event `grocery_tracker_receipt_imported` kannst du
+`categorize_products` nach jedem Import automatisch ausführen lassen.
 
 ## Sensoren
 
@@ -49,6 +75,7 @@ data:
 | Ausgaben letzten Monat | Summe des Vormonats |
 | Einkäufe diesen Monat | Anzahl Quittungen |
 | Letzter Einkauf | Betrag der letzten Quittung, Attribute: Markt, Zeitpunkt, Anzahl Positionen |
+| *Warengruppe* diesen Monat | Ausgaben pro Warengruppe seit dem 1. des Monats (ein Sensor je Gruppe) |
 
 ## Event
 

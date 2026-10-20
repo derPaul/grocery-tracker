@@ -15,6 +15,39 @@
       },
       "last_receipt_total": {
         "default": "mdi:receipt-text-check"
+      },
+      "spending_this_month_fruit_vegetables": {
+        "default": "mdi:food-apple"
+      },
+      "spending_this_month_dairy_eggs": {
+        "default": "mdi:cheese"
+      },
+      "spending_this_month_bakery": {
+        "default": "mdi:baguette"
+      },
+      "spending_this_month_meat_fish": {
+        "default": "mdi:food-drumstick"
+      },
+      "spending_this_month_pantry": {
+        "default": "mdi:pasta"
+      },
+      "spending_this_month_frozen": {
+        "default": "mdi:snowflake"
+      },
+      "spending_this_month_snacks_sweets": {
+        "default": "mdi:candy"
+      },
+      "spending_this_month_beverages": {
+        "default": "mdi:cup"
+      },
+      "spending_this_month_drugstore_household": {
+        "default": "mdi:spray-bottle"
+      },
+      "spending_this_month_deposit": {
+        "default": "mdi:bottle-soda"
+      },
+      "spending_this_month_other": {
+        "default": "mdi:help-box"
       }
     }
   },
@@ -24,6 +57,12 @@
     },
     "list_products": {
       "service": "mdi:format-list-bulleted"
+    },
+    "set_category": {
+      "service": "mdi:tag-edit"
+    },
+    "categorize_products": {
+      "service": "mdi:robot"
     }
   }
 }

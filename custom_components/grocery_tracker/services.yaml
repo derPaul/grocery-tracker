@@ -12,3 +12,52 @@ list_products:
       example: "MILCH"
       selector:
         text:
+    category:
+      selector:
+        select:
+          translation_key: category
+          options:
+            - fruit_vegetables
+            - dairy_eggs
+            - bakery
+            - meat_fish
+            - pantry
+            - frozen
+            - snacks_sweets
+            - beverages
+            - drugstore_household
+            - deposit
+            - other
+
+set_category:
+  fields:
+    product:
+      required: true
+      example: "GEM PFAN TOSKANA"
+      selector:
+        text:
+    category:
+      required: true
+      selector:
+        select:
+          translation_key: category
+          options:
+            - fruit_vegetables
+            - dairy_eggs
+            - bakery
+            - meat_fish
+            - pantry
+            - frozen
+            - snacks_sweets
+            - beverages
+            - drugstore_household
+            - deposit
+            - other
+
+categorize_products:
+  fields:
+    entity_id:
+      selector:
+        entity:
+          filter:
+            domain: ai_task

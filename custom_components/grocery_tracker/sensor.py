@@ -18,6 +18,7 @@ from homeassistant.helpers.device_registry import DeviceEntryType, DeviceInfo
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
+from .categories import CATEGORIES
 from .const import DOMAIN
 from .coordinator import GroceryStats, GroceryTrackerConfigEntry, GroceryTrackerCoordinator
 
@@ -81,6 +82,18 @@ SENSORS: tuple[GrocerySensorEntityDescription, ...] = (
     ),
 )
 
+CATEGORY_SENSORS: tuple[GrocerySensorEntityDescription, ...] = tuple(
+    GrocerySensorEntityDescription(
+        key=f"spending_this_month_{category}",
+        translation_key=f"spending_this_month_{category}",
+        device_class=SensorDeviceClass.MONETARY,
+        native_unit_of_measurement=CURRENCY_EURO,
+        suggested_display_precision=2,
+        value_fn=lambda s, category=category: s.spending_by_category_this_month[category],
+    )
+    for category in CATEGORIES
+)
+
 
 async def async_setup_entry(
     hass: HomeAssistant,
@@ -89,7 +102,9 @@ async def async_setup_entry(
 ) -> None:
     """Set up the sensors."""
     coordinator = entry.runtime_data
-    async_add_entities(GrocerySensor(coordinator, description) for description in SENSORS)
+    async_add_entities(
+        GrocerySensor(coordinator, description) for description in (*SENSORS, *CATEGORY_SENSORS)
+    )
 
 
 class GrocerySensor(CoordinatorEntity[GroceryTrackerCoordinator], SensorEntity):

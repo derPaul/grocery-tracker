@@ -63,3 +63,30 @@ def test_products(tmp_path: Path, rewe_ebon_text: str) -> None:
     assert products["PFAND 0,25 EURO"].last_price == Decimal("0.25")
 
     assert [p.name for p in store.products(search="milch")] == ["BIO H-MILCH 1,5%"]
+
+
+def test_spending_by_category(tmp_path: Path, rewe_ebon_text: str) -> None:
+    store = ReceiptStore(tmp_path / "db.sqlite")
+    store.setup()
+    store.add_receipt(parse_rewe_ebon(rewe_ebon_text))
+    march = (datetime(2024, 3, 1), datetime(2024, 4, 1))
+
+    spending = store.spending_by_category(*march)
+
+    assert spending["dairy_eggs"] == Decimal("3.48")
+    assert spending["deposit"] == Decimal("0.50")
+    assert spending["fruit_vegetables"] == Decimal("1.48")
+    assert spending["drugstore_household"] == Decimal("1.95")
+    # The discount line is printed below the water and reduces its category.
+    assert spending["beverages"] == Decimal("3.19")
+    assert spending["other"] == Decimal("0.00")
+    assert sum(spending.values()) == Decimal("10.60")
+
+    store.set_category("GOUDA JUNG", "other", "manual")
+    assert store.assigned_categories() == {"GOUDA JUNG": "other"}
+    spending = store.spending_by_category(*march)
+    assert spending["dairy_eggs"] == Decimal("1.19")
+    assert spending["other"] == Decimal("2.29")
+
+    assert store.has_product("GOUDA JUNG")
+    assert not store.has_product("GOUDA")
