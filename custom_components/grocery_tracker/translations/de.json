@@ -170,5 +170,68 @@
     "abort": {
       "not_loaded": "Grocery Tracker ist nicht geladen."
     }
+  },
+  "config_subentries": {
+    "mailbox": {
+      "entry_type": "Postfach",
+      "initiate_flow": {
+        "user": "Postfach hinzufügen",
+        "reconfigure": "Postfach ändern"
+      },
+      "step": {
+        "user": {
+          "title": "Postfach",
+          "description": "Quittungen werden aus PDF-Anhängen passender E-Mails importiert. Das Postfach wird nur gelesen – keine Mail wird als gelesen markiert, verschoben oder gelöscht.\n\nGmail: imap.gmail.com und ein App-Passwort verwenden (Google-Konto → Sicherheit → App-Passwörter). Tipp: Lege in Gmail einen Filter an, der eBon-Mails ein Label gibt, z. B. „REWE“, und trage dieses Label als Ordner ein.",
+          "data": {
+            "server": "IMAP-Server",
+            "port": "Port",
+            "username": "Benutzername",
+            "password": "Passwort",
+            "folder": "Ordner",
+            "sender": "Absender",
+            "since": "Mails durchsuchen ab"
+          },
+          "data_description": {
+            "username": "Meist deine E-Mail-Adresse.",
+            "password": "Bei Gmail ein App-Passwort, nicht dein Google-Passwort.",
+            "folder": "IMAP-Ordner oder Gmail-Label, z. B. INBOX oder REWE.",
+            "sender": "Nur Mails von diesem Absender (bzw. die diesen Text enthalten) werden durchsucht.",
+            "since": "Ältere eBons ab diesem Datum werden einmalig nachgeladen."
+          }
+        },
+        "reconfigure": {
+          "title": "Postfach ändern",
+          "description": "Passwort leer lassen, um das bisherige zu behalten. Wenn du Ordner, Absender oder Datum änderst, wird das Postfach neu durchsucht (bereits importierte Bons werden übersprungen).",
+          "data": {
+            "server": "IMAP-Server",
+            "port": "Port",
+            "username": "Benutzername",
+            "password": "Passwort",
+            "folder": "Ordner",
+            "sender": "Absender",
+            "since": "Mails durchsuchen ab"
+          }
+        }
+      },
+      "error": {
+        "invalid_auth": "Anmeldung fehlgeschlagen. Bei Gmail ein App-Passwort verwenden.",
+        "cannot_connect": "Keine Verbindung zum IMAP-Server.",
+        "folder_not_found": "Ordner nicht gefunden. Bei Gmail den Label-Namen genau so eingeben, wie er angezeigt wird."
+      },
+      "abort": {
+        "already_configured": "Dieser Postfach-Ordner ist bereits eingerichtet.",
+        "reconfigure_successful": "Postfach aktualisiert."
+      }
+    }
+  },
+  "issues": {
+    "mailbox_auth_failed": {
+      "title": "Anmeldung am Postfach fehlgeschlagen",
+      "description": "Grocery Tracker konnte sich nicht am Postfach {mailbox} anmelden. Wenn du das Passwort geändert oder widerrufen hast, öffne Einstellungen → Geräte & Dienste → Grocery Tracker und ändere das Postfach."
+    },
+    "mailbox_folder_not_found": {
+      "title": "Postfach-Ordner nicht gefunden",
+      "description": "Den Ordner „{folder}“ im Postfach {mailbox} gibt es nicht mehr. Öffne Einstellungen → Geräte & Dienste → Grocery Tracker und ändere das Postfach."
+    }
   }
 }

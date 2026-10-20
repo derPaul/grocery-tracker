@@ -170,5 +170,68 @@
     "abort": {
       "not_loaded": "Grocery Tracker is not loaded."
     }
+  },
+  "config_subentries": {
+    "mailbox": {
+      "entry_type": "Mailbox",
+      "initiate_flow": {
+        "user": "Add mailbox",
+        "reconfigure": "Change mailbox"
+      },
+      "step": {
+        "user": {
+          "title": "Mailbox",
+          "description": "Receipts are imported from PDF attachments of matching emails. The mailbox is only read; no email is marked as read, moved or deleted.\n\nGmail: use imap.gmail.com and an app password (Google account → Security → App passwords). Tip: create a Gmail filter that labels eBon emails, e.g. \"REWE\", and enter that label as folder.",
+          "data": {
+            "server": "IMAP server",
+            "port": "Port",
+            "username": "Username",
+            "password": "Password",
+            "folder": "Folder",
+            "sender": "Sender",
+            "since": "Search emails since"
+          },
+          "data_description": {
+            "username": "Usually your email address.",
+            "password": "For Gmail an app password, not your Google password.",
+            "folder": "IMAP folder or Gmail label, e.g. INBOX or REWE.",
+            "sender": "Only emails from this sender (or containing this text) are searched.",
+            "since": "Older eBons are imported once from this date on."
+          }
+        },
+        "reconfigure": {
+          "title": "Change mailbox",
+          "description": "Leave the password empty to keep the current one. Changing the folder, sender or date searches the mailbox again (receipts already imported are skipped).",
+          "data": {
+            "server": "IMAP server",
+            "port": "Port",
+            "username": "Username",
+            "password": "Password",
+            "folder": "Folder",
+            "sender": "Sender",
+            "since": "Search emails since"
+          }
+        }
+      },
+      "error": {
+        "invalid_auth": "Login failed. For Gmail use an app password.",
+        "cannot_connect": "Could not connect to the IMAP server.",
+        "folder_not_found": "Folder not found. For Gmail, enter the label name exactly as shown."
+      },
+      "abort": {
+        "already_configured": "This mailbox folder is already set up.",
+        "reconfigure_successful": "Mailbox updated."
+      }
+    }
+  },
+  "issues": {
+    "mailbox_auth_failed": {
+      "title": "Mailbox login failed",
+      "description": "Grocery Tracker could not log in to the mailbox {mailbox}. If you changed or revoked the password, open Settings → Devices & services → Grocery Tracker and change the mailbox."
+    },
+    "mailbox_folder_not_found": {
+      "title": "Mailbox folder not found",
+      "description": "The folder \"{folder}\" of the mailbox {mailbox} does not exist anymore. Open Settings → Devices & services → Grocery Tracker and change the mailbox."
+    }
   }
 }

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 from pathlib import Path
 
 import voluptuous as vol
@@ -15,7 +16,9 @@ from homeassistant.core import (
     callback,
 )
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
+from homeassistant.helpers import issue_registry as ir
 import homeassistant.helpers.config_validation as cv
+from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.helpers.typing import ConfigType
 
 from .ai import ai_task_available, async_categorize
@@ -28,6 +31,7 @@ from .const import (
     ATTR_SEARCH,
     DATABASE_FILE,
     DOMAIN,
+    MAIL_SCAN_INTERVAL,
     SERVICE_CATEGORIZE_PRODUCTS,
     SERVICE_IMPORT_RECEIPT,
     SERVICE_LIST_PRODUCTS,
@@ -209,7 +213,26 @@ async def async_setup_entry(hass: HomeAssistant, entry: GroceryTrackerConfigEntr
     await coordinator.async_config_entry_first_refresh()
     entry.runtime_data = coordinator
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+
+    # Repair issues of mailboxes that were removed.
+    mailbox_issues = {f"mailbox_{subentry_id}" for subentry_id in entry.subentries}
+    for domain, issue_id in list(ir.async_get(hass).issues):
+        if domain == DOMAIN and issue_id.startswith("mailbox_") and issue_id not in mailbox_issues:
+            ir.async_delete_issue(hass, DOMAIN, issue_id)
+
+    async def check_mailboxes(_: datetime | None = None) -> None:
+        await coordinator.async_check_mailboxes()
+
+    entry.async_on_unload(async_track_time_interval(hass, check_mailboxes, MAIL_SCAN_INTERVAL))
+    # The first scan may go back a long way; don't block startup with it.
+    entry.async_create_background_task(hass, check_mailboxes(), f"{DOMAIN} mailbox check")
+    # Options and mailboxes (subentries) changed: reload.
+    entry.async_on_unload(entry.add_update_listener(_async_reload))
     return True
+
+
+async def _async_reload(hass: HomeAssistant, entry: GroceryTrackerConfigEntry) -> None:
+    await hass.config_entries.async_reload(entry.entry_id)
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: GroceryTrackerConfigEntry) -> bool:

@@ -44,6 +44,11 @@ CREATE TABLE IF NOT EXISTS items (
 );
 CREATE INDEX IF NOT EXISTS idx_items_receipt ON items(receipt_uid);
 CREATE INDEX IF NOT EXISTS idx_items_name ON items(name);
+CREATE TABLE IF NOT EXISTS mail_state (
+    mailbox TEXT PRIMARY KEY,
+    uidvalidity INTEGER,
+    last_uid INTEGER NOT NULL
+);
 CREATE TABLE IF NOT EXISTS product_categories (
     name TEXT PRIMARY KEY,
     category TEXT NOT NULL,
@@ -271,6 +276,27 @@ class ReceiptStore:
                 conn.execute("SELECT 1 FROM items WHERE name = ? LIMIT 1", (name,)).fetchone()
                 is not None
             )
+
+    def mail_state(self, mailbox: str) -> tuple[int | None, int]:
+        """Return (UIDVALIDITY, last processed UID) of a mailbox."""
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT uidvalidity, last_uid FROM mail_state WHERE mailbox = ?", (mailbox,)
+            ).fetchone()
+        return (row[0], row[1]) if row else (None, 0)
+
+    def set_mail_state(self, mailbox: str, uidvalidity: int | None, last_uid: int) -> None:
+        """Remember the last processed message of a mailbox."""
+        with self._connect() as conn:
+            conn.execute(
+                "INSERT OR REPLACE INTO mail_state VALUES (?, ?, ?)",
+                (mailbox, uidvalidity, last_uid),
+            )
+
+    def delete_mail_state(self, mailbox: str) -> None:
+        """Forget a mailbox, so it is scanned from the start again."""
+        with self._connect() as conn:
+            conn.execute("DELETE FROM mail_state WHERE mailbox = ?", (mailbox,))
 
     def assigned_categories(self) -> dict[str, str]:
         """Return the stored (manual or AI) category per product name."""

@@ -2,27 +2,62 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
+from datetime import date
 import os
 from typing import Any
 
 import voluptuous as vol
 
 from homeassistant.config_entries import (
+    ConfigEntry,
     ConfigEntryState,
     ConfigFlow,
     ConfigFlowResult,
-    OptionsFlowWithReload,
+    ConfigSubentryFlow,
+    OptionsFlow,
+    SubentryFlowResult,
 )
+from homeassistant.const import CONF_PASSWORD, CONF_PORT, CONF_USERNAME
 from homeassistant.core import callback
 from homeassistant.helpers.selector import (
+    DateSelector,
+    NumberSelector,
+    NumberSelectorConfig,
+    NumberSelectorMode,
     SelectOptionDict,
     SelectSelector,
     SelectSelectorConfig,
     SelectSelectorMode,
+    TextSelector,
+    TextSelectorConfig,
+    TextSelectorType,
 )
+from homeassistant.util.ssl import client_context
 
-from .const import CONF_INBOX_PATH, CONF_WATCHED_PRODUCTS, DEFAULT_INBOX_DIR, DOMAIN
-from .coordinator import GroceryTrackerConfigEntry
+from .const import (
+    CONF_FOLDER,
+    CONF_INBOX_PATH,
+    CONF_SENDER,
+    CONF_SERVER,
+    CONF_SINCE,
+    CONF_WATCHED_PRODUCTS,
+    DEFAULT_INBOX_DIR,
+    DOMAIN,
+    SUBENTRY_MAILBOX,
+)
+from .coordinator import GroceryTrackerConfigEntry, mailbox_config
+from .mail import (
+    DEFAULT_FOLDER,
+    DEFAULT_PORT,
+    DEFAULT_SENDER,
+    DEFAULT_SERVER,
+    MailAuthError,
+    Mailbox,
+    MailboxConfig,
+    MailConnectionError,
+    MailFolderError,
+)
 
 
 class GroceryTrackerConfigFlow(ConfigFlow, domain=DOMAIN):
@@ -37,6 +72,14 @@ class GroceryTrackerConfigFlow(ConfigFlow, domain=DOMAIN):
     ) -> GroceryTrackerOptionsFlow:
         """Return the options flow."""
         return GroceryTrackerOptionsFlow()
+
+    @classmethod
+    @callback
+    def async_get_supported_subentry_types(
+        cls, config_entry: ConfigEntry
+    ) -> dict[str, type[ConfigSubentryFlow]]:
+        """Mailboxes are added as subentries."""
+        return {SUBENTRY_MAILBOX: MailboxSubentryFlow}
 
     async def async_step_user(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         """Ask for the inbox folder that receipts are dropped into."""
@@ -60,7 +103,7 @@ class GroceryTrackerConfigFlow(ConfigFlow, domain=DOMAIN):
         )
 
 
-class GroceryTrackerOptionsFlow(OptionsFlowWithReload):
+class GroceryTrackerOptionsFlow(OptionsFlow):
     """Choose the products whose price is tracked as a sensor."""
 
     config_entry: GroceryTrackerConfigEntry
@@ -95,4 +138,107 @@ class GroceryTrackerOptionsFlow(OptionsFlowWithReload):
                     ),
                 }
             ),
+        )
+
+
+def _mailbox_schema(defaults: Mapping[str, Any], password_required: bool) -> vol.Schema:
+    return vol.Schema(
+        {
+            vol.Required(CONF_SERVER, default=defaults.get(CONF_SERVER, DEFAULT_SERVER)): str,
+            vol.Required(CONF_PORT, default=defaults.get(CONF_PORT, DEFAULT_PORT)): NumberSelector(
+                NumberSelectorConfig(min=1, max=65535, mode=NumberSelectorMode.BOX)
+            ),
+            vol.Required(CONF_USERNAME, default=defaults.get(CONF_USERNAME, vol.UNDEFINED)): str,
+            (vol.Required if password_required else vol.Optional)(CONF_PASSWORD): TextSelector(
+                TextSelectorConfig(type=TextSelectorType.PASSWORD)
+            ),
+            vol.Required(CONF_FOLDER, default=defaults.get(CONF_FOLDER, DEFAULT_FOLDER)): str,
+            vol.Required(CONF_SENDER, default=defaults.get(CONF_SENDER, DEFAULT_SENDER)): str,
+            vol.Required(
+                CONF_SINCE,
+                default=defaults.get(CONF_SINCE, date(date.today().year, 1, 1).isoformat()),
+            ): DateSelector(),
+        }
+    )
+
+
+def _unique_id(data: Mapping[str, Any]) -> str:
+    return f"{data[CONF_SERVER]}:{data[CONF_USERNAME]}:{data[CONF_FOLDER]}".lower()
+
+
+def _title(data: Mapping[str, Any]) -> str:
+    return f"{data[CONF_USERNAME]} ({data[CONF_FOLDER]})"
+
+
+def _test_mailbox(config: MailboxConfig) -> None:
+    with Mailbox(config, client_context()):
+        pass
+
+
+class MailboxSubentryFlow(ConfigSubentryFlow):
+    """Add or change an IMAP mailbox that receives eBons."""
+
+    async def _async_validate(self, data: dict[str, Any]) -> dict[str, str]:
+        try:
+            await self.hass.async_add_executor_job(_test_mailbox, mailbox_config(data))
+        except MailAuthError:
+            return {"base": "invalid_auth"}
+        except MailFolderError:
+            return {CONF_FOLDER: "folder_not_found"}
+        except MailConnectionError:
+            return {"base": "cannot_connect"}
+        return {}
+
+    async def async_step_user(self, user_input: dict[str, Any] | None = None) -> SubentryFlowResult:
+        """Ask for the mailbox settings."""
+        errors: dict[str, str] = {}
+        if user_input is not None:
+            data = {**user_input, CONF_PORT: int(user_input[CONF_PORT])}
+            unique_id = _unique_id(data)
+            if any(sub.unique_id == unique_id for sub in self._get_entry().subentries.values()):
+                return self.async_abort(reason="already_configured")
+            if not (errors := await self._async_validate(data)):
+                return self.async_create_entry(
+                    title=_title(data),
+                    data=data,
+                    unique_id=unique_id,
+                )
+        return self.async_show_form(
+            step_id="user",
+            data_schema=self.add_suggested_values_to_schema(
+                _mailbox_schema({}, password_required=True), user_input
+            ),
+            errors=errors,
+        )
+
+    async def async_step_reconfigure(
+        self, user_input: dict[str, Any] | None = None
+    ) -> SubentryFlowResult:
+        """Change the mailbox settings; an empty password keeps the old one."""
+        subentry = self._get_reconfigure_subentry()
+        errors: dict[str, str] = {}
+        if user_input is not None:
+            data = {
+                **user_input,
+                CONF_PORT: int(user_input[CONF_PORT]),
+                CONF_PASSWORD: user_input.get(CONF_PASSWORD) or subentry.data[CONF_PASSWORD],
+            }
+            unique_id = _unique_id(data)
+            if any(
+                sub.unique_id == unique_id and sub.subentry_id != subentry.subentry_id
+                for sub in self._get_entry().subentries.values()
+            ):
+                return self.async_abort(reason="already_configured")
+            if not (errors := await self._async_validate(data)):
+                return self.async_update_and_abort(
+                    self._get_entry(),
+                    subentry,
+                    title=_title(data),
+                    data=data,
+                    unique_id=unique_id,
+                )
+        return self.async_show_form(
+            step_id="reconfigure",
+            data_schema=_mailbox_schema(subentry.data, password_required=False),
+            errors=errors,
         )

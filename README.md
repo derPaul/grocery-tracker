@@ -28,6 +28,33 @@ data:
 Bereits importierte Quittungen (gleicher Markt, gleiche Uhrzeit, gleiche Bon-Nr.) werden
 erkannt und nicht doppelt gezählt.
 
+## eBons aus dem E-Mail-Postfach
+
+Grocery Tracker kann eBons direkt aus einem IMAP-Postfach holen: alle 15 Minuten werden Mails
+vom eingestellten Absender durchsucht und PDF-Anhänge importiert. Beim ersten Mal werden alle
+eBons ab dem gewählten Datum nachgeladen. Das Postfach wird **nur gelesen** – keine Mail wird
+als gelesen markiert, verschoben oder gelöscht. Nicht lesbare Anhänge landen im `failed/`-Ordner.
+
+**Einrichtung mit Gmail:**
+
+1. **App-Passwort erstellen:** Google-Konto → Sicherheit → Bestätigung in zwei Schritten
+   (muss aktiv sein) → [App-Passwörter](https://myaccount.google.com/apppasswords), z. B.
+   „Home Assistant". Das normale Google-Passwort funktioniert nicht.
+2. **Filter anlegen (empfohlen):** In Gmail nach `from:ebon@mailing.rewe.de` suchen → Filter
+   erstellen → Label „REWE" anwenden, Haken bei „Filter auch auf übereinstimmende Konversationen
+   anwenden". Das Label ohne Umlaute benennen.
+3. **Postfach hinzufügen:** *Einstellungen → Geräte & Dienste → Grocery Tracker →
+   Postfach hinzufügen*: Server `imap.gmail.com`, Port `993`, deine Gmail-Adresse, das
+   App-Passwort, Ordner `REWE`, Absender `ebon@mailing.rewe.de` und das Startdatum.
+
+Ohne Filter geht auch Ordner `INBOX` – dann aber nur für Mails, die noch im Posteingang liegen.
+Schlägt die Anmeldung später fehl (z. B. App-Passwort widerrufen), erscheint ein Hinweis unter
+*Einstellungen → Reparaturen*; über „Postfach ändern" trägst du das neue Passwort ein.
+
+Andere Anbieter funktionieren genauso (z. B. GMX: `imap.gmx.net`, IMAP muss dort in den
+Einstellungen aktiviert sein). Es können mehrere Postfächer eingerichtet werden. Das Passwort
+wird wie bei der IMAP-Integration von Home Assistant in der Konfiguration gespeichert.
+
 ## Produkte auflisten
 
 Die Aktion `grocery_tracker.list_products` liefert alle gekauften Produkte mit Warengruppe,
