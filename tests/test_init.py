@@ -314,3 +314,28 @@ async def test_watched_products(
     await hass.async_block_till_done()
     assert er.async_get(hass).async_get(milk) is None
     assert hass.states.get("sensor.grocery_tracker_price_banane_chiquita") is not None
+
+
+async def test_year_total_and_monthly_overview(
+    hass: HomeAssistant,
+    inbox: Path,
+    rewe_ebon_text: str,
+    rewe_ebon_text_later: str,
+    freezer,
+) -> None:
+    freezer.move_to("2024-03-20 12:00:00")
+    inbox.mkdir(parents=True)
+    (inbox / "1.pdf").write_bytes(make_text_pdf(rewe_ebon_text))
+    (inbox / "2.pdf").write_bytes(make_text_pdf(rewe_ebon_text_later))
+    (inbox / "3.pdf").write_bytes(make_text_pdf(rewe_ebon_text.replace("12.03.2024", "28.12.2023")))
+    (inbox / "4.pdf").write_bytes(make_text_pdf(rewe_ebon_text.replace("12.03.2024", "02.01.2023")))
+    await _setup(hass, inbox)
+
+    assert hass.states.get("sensor.grocery_tracker_receipts_total").state == "4"
+    year = hass.states.get("sensor.grocery_tracker_spending_this_year")
+    assert year.state == "21.30"
+    months = year.attributes["last_12_months"]
+    assert len(months) == 12
+    assert months[0] == {"month": "2023-04", "amount": 0.0, "receipts": 0}
+    assert months[8] == {"month": "2023-12", "amount": 10.6, "receipts": 1}
+    assert months[-1] == {"month": "2024-03", "amount": 21.3, "receipts": 2}

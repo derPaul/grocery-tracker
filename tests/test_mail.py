@@ -104,3 +104,26 @@ def test_errors(server: FakeServer) -> None:
     server.reachable = False
     with pytest.raises(MailConnectionError), Mailbox(CONFIG):
         pass
+
+
+def test_nested_and_unnamed_pdfs() -> None:
+    from email.message import EmailMessage
+
+    from custom_components.grocery_tracker.mail import _pdf_attachments
+
+    message = EmailMessage()
+    message["From"] = "ebon@mailing.rewe.de"
+    message.set_content("Dein eBon")
+    message.add_alternative("<p>Dein eBon</p>", subtype="html")
+    # PDF nested in multipart/related inside the HTML alternative.
+    html = message.get_payload()[1]
+    html.add_related(b"%PDF-nested", maintype="application", subtype="pdf", cid="<ebon>")
+    message.add_attachment(
+        b"%PDF-octet", maintype="application", subtype="octet-stream", filename="Bon.PDF"
+    )
+    message.add_attachment(b"no pdf", maintype="text", subtype="plain", filename="info.txt")
+
+    assert _pdf_attachments(message.as_bytes()) == [
+        ("receipt.pdf", b"%PDF-nested"),
+        ("Bon.PDF", b"%PDF-octet"),
+    ]

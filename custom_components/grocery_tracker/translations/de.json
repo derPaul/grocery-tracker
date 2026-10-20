@@ -77,8 +77,15 @@
           "ok": "OK",
           "auth_failed": "Anmeldung fehlgeschlagen",
           "folder_not_found": "Ordner nicht gefunden",
-          "unreachable": "Nicht erreichbar"
+          "unreachable": "Nicht erreichbar",
+          "error": "Fehler"
         }
+      },
+      "spending_this_year": {
+        "name": "Ausgaben dieses Jahr"
+      },
+      "receipts_total": {
+        "name": "Einkäufe gesamt"
       }
     },
     "button": {

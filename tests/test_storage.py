@@ -132,3 +132,19 @@ def test_price_stats(tmp_path: Path, rewe_ebon_text: str, rewe_ebon_text_later: 
     assert store.price_stats("BANANE CHIQUITA").last == Decimal("1.49")
     assert store.price_stats("BANANE CHIQUITA").unit == "kg"
     assert store.price_stats("MINERALWASSER").last == Decimal("0.59")
+
+
+def test_monthly_spending(tmp_path: Path, rewe_ebon_text: str, rewe_ebon_text_later: str) -> None:
+    store = ReceiptStore(tmp_path / "db.sqlite")
+    store.setup()
+    store.add_receipt(parse_rewe_ebon(rewe_ebon_text))
+    store.add_receipt(parse_rewe_ebon(rewe_ebon_text_later))
+    store.add_receipt(parse_rewe_ebon(rewe_ebon_text.replace("12.03.2024", "28.12.2023")))
+
+    assert store.monthly_spending(datetime(2023, 1, 1), datetime(2025, 1, 1)) == {
+        "2023-12": (Decimal("10.60"), 1),
+        "2024-03": (Decimal("21.30"), 2),
+    }
+    assert store.monthly_spending(datetime(2024, 1, 1), datetime(2025, 1, 1)) == {
+        "2024-03": (Decimal("21.30"), 2),
+    }

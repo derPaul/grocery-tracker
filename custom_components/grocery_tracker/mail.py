@@ -84,10 +84,15 @@ def _pdf_attachments(raw: bytes) -> list[tuple[str, bytes]]:
     message = email.message_from_bytes(raw, policy=email.policy.default)
     assert isinstance(message, EmailMessage)
     pdfs = []
-    for part in message.iter_attachments():
-        filename = part.get_filename() or "receipt.pdf"
-        if part.get_content_type() == "application/pdf" or filename.lower().endswith(".pdf"):
-            pdfs.append((filename, part.get_payload(decode=True)))
+    # Walk the whole tree: the PDF can be nested, e.g. in multipart/related.
+    for part in message.walk():
+        if part.is_multipart():
+            continue
+        filename = part.get_filename() or ""
+        if part.get_content_type() != "application/pdf" and not filename.lower().endswith(".pdf"):
+            continue
+        if payload := part.get_payload(decode=True):
+            pdfs.append((filename or "receipt.pdf", payload))
     return pdfs
 
 

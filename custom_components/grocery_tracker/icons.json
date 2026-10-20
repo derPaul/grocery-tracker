@@ -60,6 +60,12 @@
         "state": {
           "ok": "mdi:email-check"
         }
+      },
+      "spending_this_year": {
+        "default": "mdi:calendar-month"
+      },
+      "receipts_total": {
+        "default": "mdi:receipt-text-outline"
       }
     },
     "button": {

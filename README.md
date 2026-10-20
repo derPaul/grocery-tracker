@@ -53,7 +53,7 @@ Schlägt die Anmeldung später fehl (z. B. App-Passwort widerrufen), erscheint e
 
 **Abruf prüfen und auslösen:** Jedes Postfach hat zwei Diagnose-Sensoren: *Letzter Abruf*
 (Zeitpunkt, Attribute `new_messages`, `new_receipts`, `error`) und *Status* (`ok`,
-`auth_failed`, `folder_not_found`, `unreachable`). Mit dem Button *Postfächer abrufen* oder
+`auth_failed`, `folder_not_found`, `unreachable`, `error`). Mit dem Button *Postfächer abrufen* oder
 der Aktion `grocery_tracker.check_mailboxes` (liefert das Ergebnis je Postfach zurück) wird
 sofort abgerufen. Im Protokoll steht bei jedem Abruf eine Zeile wie
 `Mailbox … checked: 1 new messages, 1 new receipts` (Log-Level `info` für
@@ -108,6 +108,8 @@ Tipp: Mit einer Automation auf das Event `grocery_tracker_receipt_imported` kann
 | Ausgaben diese Woche | Summe seit Montag |
 | Ausgaben diesen Monat | Summe seit dem 1. des Monats |
 | Ausgaben letzten Monat | Summe des Vormonats |
+| Ausgaben dieses Jahr | Summe seit dem 1. Januar, Attribut `last_12_months` mit Betrag und Anzahl Einkäufe je Monat |
+| Einkäufe gesamt | Anzahl aller Quittungen in der Datenbank |
 | Einkäufe diesen Monat | Anzahl Quittungen |
 | Letzter Einkauf | Betrag der letzten Quittung, Attribute: Markt, Zeitpunkt, Anzahl Positionen |
 | *Warengruppe* diesen Monat | Ausgaben pro Warengruppe seit dem 1. des Monats (ein Sensor je Gruppe) |
@@ -119,8 +121,9 @@ Einzelne Artikel bekommen bewusst **keine** eigenen Entitäten. Stattdessen:
   Einheit, Stück-/kg-Preis, Betrag).
 - **Ausgaben diesen Monat** hat das Attribut `top_products` mit den 10 Produkten, für die
   diesen Monat am meisten ausgegeben wurde.
+- **Ausgaben dieses Jahr** hat das Attribut `last_12_months` (Monat, Betrag, Anzahl Einkäufe).
 
-Beide Listen werden nicht in der Recorder-Datenbank gespeichert.
+Diese Listen werden nicht in der Recorder-Datenbank gespeichert.
 
 ## Beobachtete Produkte und Preisverlauf
 
@@ -181,6 +184,19 @@ content: |
   |:--|--:|--:|
   {% for p in state_attr('sensor.grocery_tracker_spending_this_month', 'top_products') or [] -%}
   | {{ p.name }} | {{ p.purchases }} | {{ '%.2f' | format(p.amount) | replace('.', ',') }} € |
+  {% endfor %}
+```
+
+**Ausgaben der letzten 12 Monate** (Markdown-Karte):
+
+```yaml
+type: markdown
+title: Ausgaben pro Monat
+content: |
+  | Monat | Einkäufe | Summe |
+  |:--|--:|--:|
+  {% for m in (state_attr('sensor.grocery_tracker_spending_this_year', 'last_12_months') or []) | reverse -%}
+  | {{ m.month[5:] }}/{{ m.month[:4] }} | {{ m.receipts }} | {{ '%.2f' | format(m.amount) | replace('.', ',') }} € |
   {% endfor %}
 ```
 

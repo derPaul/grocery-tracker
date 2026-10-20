@@ -77,8 +77,15 @@
           "ok": "OK",
           "auth_failed": "Login failed",
           "folder_not_found": "Folder not found",
-          "unreachable": "Not reachable"
+          "unreachable": "Not reachable",
+          "error": "Error"
         }
+      },
+      "spending_this_year": {
+        "name": "Spending this year"
+      },
+      "receipts_total": {
+        "name": "Receipts total"
       }
     },
     "button": {

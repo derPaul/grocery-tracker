@@ -222,3 +222,25 @@ async def test_check_mailboxes_button_action_and_status(
     assert response["mailboxes"][0]["status"] == "auth_failed"
     await hass.async_block_till_done()
     assert hass.states.get(status).state == "auth_failed"
+
+
+async def test_unexpected_error_shows_in_status(
+    hass: HomeAssistant,
+    inbox: Path,  # noqa: F811
+    server: FakeServer,
+) -> None:
+    server.add(
+        "REWE", 10, SENDER, date(2024, 3, 12), make_mail(SENDER, "x", date(2024, 3, 12), b"%PDF")
+    )
+    entry = await _setup(hass, inbox)
+    with patch(
+        "custom_components.grocery_tracker.mail._pdf_attachments",
+        side_effect=RuntimeError("boom"),
+    ):
+        await _add_mailbox(hass, entry.entry_id)
+    entry = hass.config_entries.async_get_entry(entry.entry_id)
+    (subentry,) = entry.subentries.values()
+    state = hass.states.get(_mailbox_entity(hass, subentry.subentry_id, "status"))
+    assert state.state == "error"
+    last_check = hass.states.get(_mailbox_entity(hass, subentry.subentry_id, "last_check"))
+    assert last_check.attributes["error"] == "RuntimeError: boom"

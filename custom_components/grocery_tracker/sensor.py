@@ -111,6 +111,25 @@ SENSORS: tuple[GrocerySensorEntityDescription, ...] = (
         value_fn=lambda s: s.spending_last_month,
     ),
     GrocerySensorEntityDescription(
+        key="spending_this_year",
+        translation_key="spending_this_year",
+        device_class=SensorDeviceClass.MONETARY,
+        native_unit_of_measurement=CURRENCY_EURO,
+        suggested_display_precision=2,
+        value_fn=lambda s: s.spending_this_year,
+        attrs_fn=lambda s: {
+            "last_12_months": [
+                {"month": month, "amount": float(amount), "receipts": receipts}
+                for month, amount, receipts in s.last_12_months
+            ]
+        },
+    ),
+    GrocerySensorEntityDescription(
+        key="receipts_total",
+        translation_key="receipts_total",
+        value_fn=lambda s: s.receipts_total,
+    ),
+    GrocerySensorEntityDescription(
         key="receipts_this_month",
         translation_key="receipts_this_month",
         value_fn=lambda s: s.receipts_this_month,
@@ -183,7 +202,7 @@ class GrocerySensor(CoordinatorEntity[GroceryTrackerCoordinator], SensorEntity):
 
     _attr_has_entity_name = True
     # Item lists change with every receipt; keep them out of the recorder.
-    _unrecorded_attributes = frozenset({"items", "top_products"})
+    _unrecorded_attributes = frozenset({"items", "top_products", "last_12_months"})
     entity_description: GrocerySensorEntityDescription
 
     def __init__(

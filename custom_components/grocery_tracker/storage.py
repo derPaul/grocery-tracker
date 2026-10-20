@@ -220,6 +220,17 @@ class ReceiptStore:
             ).fetchone()
         return count
 
+    def monthly_spending(self, start: datetime, end: datetime) -> dict[str, tuple[Decimal, int]]:
+        """Return amount and number of receipts per month ("YYYY-MM") in [start, end)."""
+        with self._connect() as conn:
+            rows = conn.execute(
+                "SELECT substr(timestamp, 1, 7) AS month, SUM(total_cents), COUNT(*)"
+                " FROM receipts WHERE timestamp >= ? AND timestamp < ?"
+                " GROUP BY month",
+                (start.isoformat(), end.isoformat()),
+            ).fetchall()
+        return {month: (_euros(cents), count) for month, cents, count in rows}
+
     def last_receipt(self) -> ReceiptSummary | None:
         """Return the most recent receipt."""
         with self._connect() as conn:

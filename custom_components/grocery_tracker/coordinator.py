@@ -81,7 +81,14 @@ MAILBOX_OK = "ok"
 MAILBOX_AUTH_FAILED = "auth_failed"
 MAILBOX_FOLDER_NOT_FOUND = "folder_not_found"
 MAILBOX_UNREACHABLE = "unreachable"
-MAILBOX_STATES = [MAILBOX_OK, MAILBOX_AUTH_FAILED, MAILBOX_FOLDER_NOT_FOUND, MAILBOX_UNREACHABLE]
+MAILBOX_ERROR = "error"
+MAILBOX_STATES = [
+    MAILBOX_OK,
+    MAILBOX_AUTH_FAILED,
+    MAILBOX_FOLDER_NOT_FOUND,
+    MAILBOX_UNREACHABLE,
+    MAILBOX_ERROR,
+]
 
 
 @dataclass(frozen=True, slots=True)
@@ -102,7 +109,10 @@ class GroceryStats:
     spending_this_week: Decimal
     spending_this_month: Decimal
     spending_last_month: Decimal
+    spending_this_year: Decimal
     receipts_this_month: int
+    receipts_total: int
+    last_12_months: list[tuple[str, Decimal, int]]
     last_receipt: ReceiptSummary | None
     spending_by_category_this_month: dict[str, Decimal]
     last_receipt_items: list[ItemDetail]
@@ -319,6 +329,12 @@ class GroceryTrackerCoordinator(DataUpdateCoordinator[GroceryStats]):
                     self.mailbox_status[subentry.subentry_id] = MailboxStatus(
                         now, MAILBOX_UNREACHABLE, error=str(err)
                     )
+                except Exception as err:
+                    # A bug or an unexpected server answer: show it instead of failing silently.
+                    _LOGGER.exception("Error checking mailbox %s", subentry.title)
+                    self.mailbox_status[subentry.subentry_id] = MailboxStatus(
+                        now, MAILBOX_ERROR, error=f"{type(err).__name__}: {err}"
+                    )
                 else:
                     _LOGGER.info(
                         "Mailbox %s checked: %d new messages, %d new receipts",
@@ -338,6 +354,20 @@ class GroceryTrackerCoordinator(DataUpdateCoordinator[GroceryStats]):
                 self.async_update_listeners()
             return dict(self.mailbox_status)
 
+    def _last_12_months(self, month_start: datetime) -> list[tuple[str, Decimal, int]]:
+        """Return (month, amount, receipts) for the current and the 11 previous months."""
+        months = [month_start]
+        while len(months) < 12:
+            months.append((months[-1] - timedelta(days=1)).replace(day=1))
+        months.reverse()
+        spending = self.store.monthly_spending(months[0], datetime.max)
+        result = []
+        for month in months:
+            key = month.strftime("%Y-%m")
+            amount, receipts = spending.get(key, (Decimal("0.00"), 0))
+            result.append((key, amount, receipts))
+        return result
+
     def _compute_stats(self, now: datetime) -> GroceryStats:
         today = now.replace(hour=0, minute=0, second=0, microsecond=0)
         week_start = today - timedelta(days=today.weekday())
@@ -349,7 +379,12 @@ class GroceryTrackerCoordinator(DataUpdateCoordinator[GroceryStats]):
             spending_this_week=self.store.spending_between(week_start, far_future),
             spending_this_month=self.store.spending_between(month_start, far_future),
             spending_last_month=self.store.spending_between(last_month_start, month_start),
+            spending_this_year=self.store.spending_between(
+                today.replace(month=1, day=1), far_future
+            ),
             receipts_this_month=self.store.receipt_count_between(month_start, far_future),
+            receipts_total=self.store.receipt_count_between(datetime.min, far_future),
+            last_12_months=self._last_12_months(month_start),
             last_receipt=last,
             spending_by_category_this_month=self.store.spending_by_category(
                 month_start, far_future
