@@ -65,6 +65,17 @@ class ReceiptSummary:
     item_count: int
 
 
+@dataclass(frozen=True, slots=True)
+class ProductSummary:
+    """A product (item name) with its purchase history condensed."""
+
+    name: str
+    purchases: int
+    last_price: Decimal
+    unit: str
+    last_seen: datetime
+
+
 class ReceiptStore:
     """Persist receipts in a SQLite database."""
 
@@ -163,3 +174,33 @@ class ReceiptStore:
             total=_euros(total_cents),
             item_count=item_count,
         )
+
+    def products(self, search: str | None = None) -> list[ProductSummary]:
+        """Return all purchased products, most frequently bought first.
+
+        ``last_price`` is the price per unit (piece or kg) of the latest
+        purchase. Discount lines are left out.
+        """
+        with self._connect() as conn:
+            rows = conn.execute(
+                "WITH ranked AS ("
+                " SELECT i.name, i.unit, r.timestamp,"
+                "  COALESCE(i.unit_price_cents, i.total_cents) AS price_cents,"
+                "  COUNT(*) OVER (PARTITION BY i.name) AS purchases,"
+                "  ROW_NUMBER() OVER (PARTITION BY i.name ORDER BY r.timestamp DESC) AS rn"
+                " FROM items i JOIN receipts r ON r.uid = i.receipt_uid"
+                " WHERE i.total_cents > 0 AND (?1 IS NULL OR instr(upper(i.name), upper(?1)) > 0)"
+                ") SELECT name, purchases, price_cents, unit, timestamp FROM ranked"
+                " WHERE rn = 1 ORDER BY purchases DESC, name",
+                (search,),
+            ).fetchall()
+        return [
+            ProductSummary(
+                name=name,
+                purchases=purchases,
+                last_price=_euros(price_cents),
+                unit=unit,
+                last_seen=datetime.fromisoformat(timestamp),
+            )
+            for name, purchases, price_cents, unit, timestamp in rows
+        ]

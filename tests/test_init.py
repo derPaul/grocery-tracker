@@ -13,6 +13,7 @@ from custom_components.grocery_tracker.const import (
     DOMAIN,
     EVENT_RECEIPT_IMPORTED,
     SERVICE_IMPORT_RECEIPT,
+    SERVICE_LIST_PRODUCTS,
 )
 from homeassistant import config_entries
 from homeassistant.core import HomeAssistant
@@ -109,6 +110,29 @@ async def test_import_action(hass: HomeAssistant, inbox: Path, rewe_ebon_text: s
                 DOMAIN, SERVICE_IMPORT_RECEIPT, {"path": path}, blocking=True
             )
         assert exc_info.value.translation_key == error
+
+
+async def test_list_products(hass: HomeAssistant, inbox: Path, rewe_ebon_text: str) -> None:
+    inbox.mkdir(parents=True)
+    (inbox / "ebon.pdf").write_bytes(make_text_pdf(rewe_ebon_text))
+    await _setup(hass, inbox)
+
+    response = await hass.services.async_call(
+        DOMAIN, SERVICE_LIST_PRODUCTS, {}, blocking=True, return_response=True
+    )
+    assert len(response["products"]) == 6
+    assert response["products"][0] == {
+        "name": "BANANE CHIQUITA",
+        "purchases": 1,
+        "last_price": 1.49,
+        "unit": "kg",
+        "last_seen": "2024-03-12T18:23:00",
+    }
+
+    response = await hass.services.async_call(
+        DOMAIN, SERVICE_LIST_PRODUCTS, {"search": "wasser"}, blocking=True, return_response=True
+    )
+    assert [p["name"] for p in response["products"]] == ["MINERALWASSER"]
 
 
 async def test_unload(hass: HomeAssistant, inbox: Path) -> None:

@@ -25,6 +25,18 @@ data:
   path: /config/grocery_tracker/ebon.pdf
 ```
 
+## Produkte auflisten
+
+Die Aktion `grocery_tracker.list_products` liefert alle gekauften Produkte mit Anzahl Käufe,
+letztem Preis (pro Stück bzw. pro kg) und Datum des letzten Kaufs. Optional filtert `search`
+nach einem Teil des Namens. Am einfachsten unter *Entwicklerwerkzeuge → Aktionen* ausführen.
+
+```yaml
+action: grocery_tracker.list_products
+data:
+  search: milch
+```
+
 Bereits importierte Quittungen (gleicher Markt, gleiche Uhrzeit, gleiche Bon-Nr.) werden
 erkannt und nicht doppelt gezählt.
 

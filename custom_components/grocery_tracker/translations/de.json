@@ -44,6 +44,16 @@
           "description": "Absoluter Pfad zur Quittungsdatei."
         }
       }
+    },
+    "list_products": {
+      "name": "Produkte auflisten",
+      "description": "Listet alle gekauften Produkte mit Anzahl Käufe und letztem Preis (pro Stück bzw. kg).",
+      "fields": {
+        "search": {
+          "name": "Suche",
+          "description": "Nur Produkte auflisten, deren Name diesen Text enthält."
+        }
+      }
     }
   },
   "exceptions": {

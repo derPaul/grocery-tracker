@@ -15,6 +15,8 @@ FAILED_DIR: Final = "failed"
 SCAN_INTERVAL: Final = timedelta(minutes=5)
 
 SERVICE_IMPORT_RECEIPT: Final = "import_receipt"
+SERVICE_LIST_PRODUCTS: Final = "list_products"
 ATTR_PATH: Final = "path"
+ATTR_SEARCH: Final = "search"
 
 EVENT_RECEIPT_IMPORTED: Final = f"{DOMAIN}_receipt_imported"

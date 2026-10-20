@@ -5,3 +5,10 @@ import_receipt:
       example: "/config/grocery_tracker/ebon.pdf"
       selector:
         text:
+
+list_products:
+  fields:
+    search:
+      example: "MILCH"
+      selector:
+        text:

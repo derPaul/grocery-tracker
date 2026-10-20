@@ -7,12 +7,25 @@ from pathlib import Path
 import voluptuous as vol
 
 from homeassistant.const import Platform
-from homeassistant.core import HomeAssistant, ServiceCall, ServiceResponse, SupportsResponse
+from homeassistant.core import (
+    HomeAssistant,
+    ServiceCall,
+    ServiceResponse,
+    SupportsResponse,
+    callback,
+)
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 import homeassistant.helpers.config_validation as cv
 from homeassistant.helpers.typing import ConfigType
 
-from .const import ATTR_PATH, DATABASE_FILE, DOMAIN, SERVICE_IMPORT_RECEIPT
+from .const import (
+    ATTR_PATH,
+    ATTR_SEARCH,
+    DATABASE_FILE,
+    DOMAIN,
+    SERVICE_IMPORT_RECEIPT,
+    SERVICE_LIST_PRODUCTS,
+)
 from .coordinator import GroceryTrackerConfigEntry, GroceryTrackerCoordinator
 from .parsers import ReceiptParseError
 from .storage import ReceiptStore
@@ -22,6 +35,15 @@ PLATFORMS: list[Platform] = [Platform.SENSOR]
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
 IMPORT_RECEIPT_SCHEMA = vol.Schema({vol.Required(ATTR_PATH): cv.string})
+LIST_PRODUCTS_SCHEMA = vol.Schema({vol.Optional(ATTR_SEARCH): cv.string})
+
+
+@callback
+def _get_coordinator(hass: HomeAssistant) -> GroceryTrackerCoordinator:
+    entries = hass.config_entries.async_loaded_entries(DOMAIN)
+    if not entries:
+        raise ServiceValidationError(translation_domain=DOMAIN, translation_key="not_loaded")
+    return entries[0].runtime_data
 
 
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
@@ -29,10 +51,7 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
 
     async def import_receipt(call: ServiceCall) -> ServiceResponse:
         path = Path(call.data[ATTR_PATH])
-        entries = hass.config_entries.async_loaded_entries(DOMAIN)
-        if not entries:
-            raise ServiceValidationError(translation_domain=DOMAIN, translation_key="not_loaded")
-        coordinator: GroceryTrackerCoordinator = entries[0].runtime_data
+        coordinator = _get_coordinator(hass)
 
         def check_path() -> str | None:
             """Return a translation key if the file must not be imported."""
@@ -77,6 +96,32 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
         import_receipt,
         schema=IMPORT_RECEIPT_SCHEMA,
         supports_response=SupportsResponse.OPTIONAL,
+    )
+
+    async def list_products(call: ServiceCall) -> ServiceResponse:
+        coordinator = _get_coordinator(hass)
+        products = await hass.async_add_executor_job(
+            coordinator.store.products, call.data.get(ATTR_SEARCH)
+        )
+        return {
+            "products": [
+                {
+                    "name": product.name,
+                    "purchases": product.purchases,
+                    "last_price": float(product.last_price),
+                    "unit": product.unit,
+                    "last_seen": product.last_seen.isoformat(),
+                }
+                for product in products
+            ]
+        }
+
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_LIST_PRODUCTS,
+        list_products,
+        schema=LIST_PRODUCTS_SCHEMA,
+        supports_response=SupportsResponse.ONLY,
     )
     return True
 

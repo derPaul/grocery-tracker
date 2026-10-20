@@ -44,6 +44,16 @@
           "description": "Absolute path to the receipt file."
         }
       }
+    },
+    "list_products": {
+      "name": "List products",
+      "description": "Lists all purchased products with number of purchases and latest price (per piece or kg).",
+      "fields": {
+        "search": {
+          "name": "Search",
+          "description": "Only list products whose name contains this text."
+        }
+      }
     }
   },
   "exceptions": {
