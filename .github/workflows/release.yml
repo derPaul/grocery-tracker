@@ -21,10 +21,16 @@ jobs:
           python-version: "3.13"
 
       - name: Determine tag
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           version=$(jq -r .version custom_components/grocery_tracker/manifest.json)
           if [ "${GITHUB_REF_TYPE}" = "tag" ] && [ "v${version}" != "${GITHUB_REF_NAME}" ]; then
             echo "Tag ${GITHUB_REF_NAME} does not match manifest version ${version}"
+            exit 1
+          fi
+          if gh release view "v${version}" > /dev/null 2>&1; then
+            echo "::error::Release v${version} already exists. Raise the version in custom_components/grocery_tracker/manifest.json first."
             exit 1
           fi
           echo "TAG=v${version}" >> "${GITHUB_ENV}"
