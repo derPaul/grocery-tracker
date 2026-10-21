@@ -16,7 +16,11 @@ from homeassistant.core import (
     callback,
 )
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
-from homeassistant.helpers import issue_registry as ir
+from homeassistant.helpers import (
+    device_registry as dr,
+    entity_registry as er,
+    issue_registry as ir,
+)
 import homeassistant.helpers.config_validation as cv
 from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.helpers.typing import ConfigType
@@ -44,6 +48,7 @@ from .const import (
     SERVICE_IMPORT_RECEIPT,
     SERVICE_LIST_PRODUCTS,
     SERVICE_SET_CATEGORY,
+    SUBENTRY_CATEGORY,
 )
 from .coordinator import (
     GroceryTrackerConfigEntry,
@@ -352,6 +357,7 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
 
 async def async_setup_entry(hass: HomeAssistant, entry: GroceryTrackerConfigEntry) -> bool:
     """Set up Grocery Tracker from a config entry."""
+    _async_unlink_categories_from_main_device(hass, entry)
     store = ReceiptStore(hass.config.path(DATABASE_FILE))
     coordinator = GroceryTrackerCoordinator(hass, entry, store)
     await coordinator.async_setup()
@@ -374,6 +380,39 @@ async def async_setup_entry(hass: HomeAssistant, entry: GroceryTrackerConfigEntr
     # Options and mailboxes (subentries) changed: reload.
     entry.async_on_unload(entry.add_update_listener(_async_reload))
     return True
+
+
+@callback
+def _async_unlink_categories_from_main_device(
+    hass: HomeAssistant, entry: GroceryTrackerConfigEntry
+) -> None:
+    """Repair installations of 0.8.0.
+
+    0.8.0 registered custom category sensors on the main device under their
+    category subentry. That links the main device to the subentry, and the
+    frontend then lists the device and all its entities under the category.
+    Move the sensors to the main entry first (unlinking the device would
+    otherwise remove them), then unlink the device.
+    """
+    categories = {
+        subentry_id
+        for subentry_id, subentry in entry.subentries.items()
+        if subentry.subentry_type == SUBENTRY_CATEGORY
+    }
+    if not categories:
+        return
+    entity_registry = er.async_get(hass)
+    for entity in er.async_entries_for_config_entry(entity_registry, entry.entry_id):
+        if entity.config_subentry_id in categories:
+            entity_registry.async_update_entity(entity.entity_id, config_subentry_id=None)
+    device_registry = dr.async_get(hass)
+    if device := device_registry.async_get_device(identifiers={(DOMAIN, entry.entry_id)}):
+        for subentry_id in categories & device.config_entries_subentries.get(entry.entry_id, set()):
+            device_registry.async_update_device(
+                device.id,
+                remove_config_entry_id=entry.entry_id,
+                remove_config_subentry_id=subentry_id,
+            )
 
 
 async def _async_reload(hass: HomeAssistant, entry: GroceryTrackerConfigEntry) -> None:

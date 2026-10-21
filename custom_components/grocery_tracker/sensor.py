@@ -167,21 +167,32 @@ async def async_setup_entry(
     coordinator = entry.runtime_data
     watched = coordinator.watched_products
 
-    # Remove price sensors of products that are no longer watched.
+    # Custom category sensors belong to the main entry and device, not to the
+    # category subentry: linking the main device to a subentry makes the frontend
+    # list the device (with all its entities) under that subentry.
+    custom_sensors = [
+        _custom_category_description(subentry.data)
+        for subentry in entry.subentries.values()
+        if subentry.subentry_type == SUBENTRY_CATEGORY
+    ]
+
+    # Remove sensors of products no longer watched and of removed categories.
     registry = er.async_get(hass)
     price_prefix = f"{entry.entry_id}_price_"
+    custom_prefix = f"{entry.entry_id}_spending_this_month_custom_"
+    custom_ids = {f"{entry.entry_id}_{description.key}" for description in custom_sensors}
     for entity in er.async_entries_for_config_entry(registry, entry.entry_id):
         if (
             entity.unique_id.startswith(price_prefix)
             and entity.unique_id.removeprefix(price_prefix) not in watched
-        ):
+        ) or (entity.unique_id.startswith(custom_prefix) and entity.unique_id not in custom_ids):
             registry.async_remove(entity.entity_id)
 
     async_add_entities(
         [
             *(
                 GrocerySensor(coordinator, description)
-                for description in (*SENSORS, *CATEGORY_SENSORS)
+                for description in (*SENSORS, *CATEGORY_SENSORS, *custom_sensors)
             ),
             *(PriceSensor(coordinator, product) for product in watched),
         ]
@@ -193,11 +204,6 @@ async def async_setup_entry(
                     MailboxSensor(coordinator, subentry.subentry_id, subentry.title, description)
                     for description in MAILBOX_SENSORS
                 ],
-                config_subentry_id=subentry.subentry_id,
-            )
-        elif subentry.subentry_type == SUBENTRY_CATEGORY:
-            async_add_entities(
-                [GrocerySensor(coordinator, _custom_category_description(subentry.data))],
                 config_subentry_id=subentry.subentry_id,
             )
 

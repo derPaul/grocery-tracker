@@ -16,7 +16,7 @@ from homeassistant.config_entries import SOURCE_RECONFIGURE, SOURCE_USER
 from homeassistant.core import HomeAssistant, ServiceCall, SupportsResponse
 from homeassistant.data_entry_flow import FlowResultType
 from homeassistant.exceptions import ServiceValidationError
-from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers import device_registry as dr, entity_registry as er
 
 from .conftest import make_text_pdf
 from .test_init import _setup, inbox  # noqa: F401
@@ -145,3 +145,59 @@ async def test_ai_knows_custom_categories(
     assert "- custom_baby: Babynahrung und Windeln" in call.data["instructions"]
     (field,) = call.data["structure"].values()
     assert "custom_baby" in field["selector"]["select"]["options"]
+
+
+async def test_category_does_not_take_over_main_device(
+    hass: HomeAssistant,
+    inbox: Path,  # noqa: F811
+) -> None:
+    """Regression: 0.8.0 linked the main device to the category subentry.
+
+    The frontend then showed the main device and all its entities under the
+    category instead of under the integration.
+    """
+    entry = await _setup(hass, inbox)
+    await _add_category(hass, entry.entry_id, {"name": "Baby"})
+
+    device = dr.async_get(hass).async_get_device(identifiers={(DOMAIN, entry.entry_id)})
+    assert device.config_entries_subentries[entry.entry_id] == {None}
+    registry = er.async_get(hass)
+    sensor = registry.async_get(
+        registry.async_get_entity_id(
+            "sensor", DOMAIN, f"{entry.entry_id}_spending_this_month_custom_baby"
+        )
+    )
+    assert sensor.config_subentry_id is None
+    assert sensor.device_id == device.id
+
+
+async def test_repair_installations_of_0_8_0(
+    hass: HomeAssistant,
+    inbox: Path,  # noqa: F811
+) -> None:
+    entry = await _setup(hass, inbox)
+    await _add_category(hass, entry.entry_id, {"name": "Baby"})
+    entry = hass.config_entries.async_get_entry(entry.entry_id)
+    (subentry,) = entry.subentries.values()
+    registry = er.async_get(hass)
+    devices = dr.async_get(hass)
+    sensor_id = registry.async_get_entity_id(
+        "sensor", DOMAIN, f"{entry.entry_id}_spending_this_month_custom_baby"
+    )
+    device = devices.async_get_device(identifiers={(DOMAIN, entry.entry_id)})
+    # Recreate what 0.8.0 left behind.
+    devices.async_update_device(
+        device.id, add_config_entry_id=entry.entry_id, add_config_subentry_id=subentry.subentry_id
+    )
+    registry.async_update_entity(sensor_id, config_subentry_id=subentry.subentry_id)
+    before = {e.entity_id for e in er.async_entries_for_config_entry(registry, entry.entry_id)}
+
+    assert await hass.config_entries.async_reload(entry.entry_id)
+    await hass.async_block_till_done(wait_background_tasks=True)
+
+    device = devices.async_get(device.id)
+    assert device.config_entries_subentries[entry.entry_id] == {None}
+    assert registry.async_get(sensor_id).config_subentry_id is None
+    after = {e.entity_id for e in er.async_entries_for_config_entry(registry, entry.entry_id)}
+    assert after == before
+    assert all(hass.states.get(entity_id) for entity_id in after)
