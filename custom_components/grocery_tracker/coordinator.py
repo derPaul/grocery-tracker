@@ -130,6 +130,7 @@ class GroceryStats:
     receipts_this_month: int
     receipts_total: int
     last_12_months: list[tuple[str, Decimal, int]]
+    product_names: list[str]
     last_receipt: ReceiptSummary | None
     spending_by_category_this_month: dict[str, Decimal]
     last_receipt_items: list[ItemDetail]
@@ -158,6 +159,9 @@ class GroceryTrackerCoordinator(DataUpdateCoordinator[GroceryStats]):
         self.inbox = Path(entry.data[CONF_INBOX_PATH])
         self._mail_lock = asyncio.Lock()
         self.mailbox_status: dict[str, MailboxStatus] = {}
+        # What is chosen in the dashboard controls (select and text entities),
+        # read by the buttons.
+        self.selection: dict[str, str | None] = {}
 
     @property
     def watched_products(self) -> list[str]:
@@ -403,6 +407,8 @@ class GroceryTrackerCoordinator(DataUpdateCoordinator[GroceryStats]):
             receipts_this_month=self.store.receipt_count_between(month_start, far_future),
             receipts_total=self.store.receipt_count_between(datetime.min, far_future),
             last_12_months=self._last_12_months(month_start),
+            # Most frequently bought first, for the product select in the dashboard.
+            product_names=[product.name for product in self.store.products()],
             last_receipt=last,
             spending_by_category_this_month=self.store.spending_by_category(
                 month_start, far_future

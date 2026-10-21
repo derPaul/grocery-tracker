@@ -74,6 +74,34 @@
     "button": {
       "check_mailboxes": {
         "default": "mdi:email-sync"
+      },
+      "watch_product": {
+        "default": "mdi:tag-plus"
+      },
+      "unwatch_product": {
+        "default": "mdi:tag-remove"
+      },
+      "assign_category": {
+        "default": "mdi:tag-arrow-right"
+      },
+      "create_category": {
+        "default": "mdi:shape-plus"
+      }
+    },
+    "select": {
+      "product": {
+        "default": "mdi:food-apple"
+      },
+      "category": {
+        "default": "mdi:shape"
+      }
+    },
+    "text": {
+      "new_category_name": {
+        "default": "mdi:shape-plus"
+      },
+      "new_category_keywords": {
+        "default": "mdi:text-search"
       }
     }
   },
@@ -95,6 +123,15 @@
     },
     "get_statistics": {
       "service": "mdi:chart-box-outline"
+    },
+    "watch_product": {
+      "service": "mdi:tag-plus"
+    },
+    "unwatch_product": {
+      "service": "mdi:tag-remove"
+    },
+    "create_category": {
+      "service": "mdi:shape-plus"
     }
   }
 }

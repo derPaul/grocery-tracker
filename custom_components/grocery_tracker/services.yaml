@@ -92,3 +92,35 @@ get_statistics:
       default: false
       selector:
         boolean:
+
+watch_product:
+  fields:
+    product:
+      required: true
+      example: "FEINE BUTTER"
+      selector:
+        text:
+
+unwatch_product:
+  fields:
+    product:
+      required: true
+      example: "FEINE BUTTER"
+      selector:
+        text:
+
+create_category:
+  fields:
+    name:
+      required: true
+      example: "Baby"
+      selector:
+        text:
+    keywords:
+      example: "WINDEL, HIPP"
+      selector:
+        text:
+    description:
+      example: "Babynahrung, Windeln, Pflegeprodukte"
+      selector:
+        text:

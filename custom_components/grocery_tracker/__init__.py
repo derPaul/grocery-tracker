@@ -7,7 +7,7 @@ from pathlib import Path
 
 import voluptuous as vol
 
-from homeassistant.const import Platform
+from homeassistant.const import CONF_DESCRIPTION, CONF_NAME, Platform
 from homeassistant.core import (
     HomeAssistant,
     ServiceCall,
@@ -27,7 +27,6 @@ from homeassistant.helpers.typing import ConfigType
 from homeassistant.util import dt as dt_util
 
 from .ai import ai_task_available, async_categorize
-from .categories import CATEGORIES, CategoryResolver
 from .const import (
     ATTR_CATEGORY,
     ATTR_END,
@@ -39,15 +38,19 @@ from .const import (
     ATTR_SEARCH,
     ATTR_START,
     ATTR_TOP,
+    CONF_KEYWORDS,
     DATABASE_FILE,
     DOMAIN,
     MAIL_SCAN_INTERVAL,
     SERVICE_CATEGORIZE_PRODUCTS,
     SERVICE_CHECK_MAILBOXES,
+    SERVICE_CREATE_CATEGORY,
     SERVICE_GET_STATISTICS,
     SERVICE_IMPORT_RECEIPT,
     SERVICE_LIST_PRODUCTS,
     SERVICE_SET_CATEGORY,
+    SERVICE_UNWATCH_PRODUCT,
+    SERVICE_WATCH_PRODUCT,
     SUBENTRY_CATEGORY,
 )
 from .coordinator import (
@@ -55,10 +58,16 @@ from .coordinator import (
     GroceryTrackerCoordinator,
     local_isoformat,
 )
+from .management import (
+    async_assign_category,
+    async_set_watched,
+    create_category,
+    lookup_category,
+)
 from .parsers import ReceiptParseError
 from .storage import ReceiptStore
 
-PLATFORMS: list[Platform] = [Platform.BUTTON, Platform.SENSOR]
+PLATFORMS: list[Platform] = [Platform.BUTTON, Platform.SELECT, Platform.SENSOR, Platform.TEXT]
 
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
@@ -73,6 +82,14 @@ SET_CATEGORY_SCHEMA = vol.Schema(
     {
         vol.Required(ATTR_PRODUCT): cv.string,
         vol.Required(ATTR_CATEGORY): cv.string,
+    }
+)
+PRODUCT_SCHEMA = vol.Schema({vol.Required(ATTR_PRODUCT): cv.string})
+CREATE_CATEGORY_SCHEMA = vol.Schema(
+    {
+        vol.Required(CONF_NAME): cv.string,
+        vol.Optional(CONF_KEYWORDS, default=""): cv.string,
+        vol.Optional(CONF_DESCRIPTION, default=""): cv.string,
     }
 )
 CATEGORIZE_PRODUCTS_SCHEMA = vol.Schema({vol.Optional(ATTR_ENTITY_ID): cv.entity_id})
@@ -112,20 +129,6 @@ def _statistics_period(data: dict) -> tuple[datetime, datetime]:
     if end <= start:
         raise ServiceValidationError(translation_domain=DOMAIN, translation_key="invalid_period")
     return start, end
-
-
-def _category_key(resolver: CategoryResolver, value: str) -> str:
-    """Return the key for a category key or custom category name."""
-    if (key := resolver.lookup(value)) is None:
-        raise ServiceValidationError(
-            translation_domain=DOMAIN,
-            translation_key="unknown_category",
-            translation_placeholders={
-                "category": value,
-                "categories": ", ".join([*CATEGORIES, *(c.name for c in resolver.custom)]),
-            },
-        )
-    return key
 
 
 @callback
@@ -205,7 +208,7 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
             for product in products
         ]
         if (value := call.data.get(ATTR_CATEGORY)) is not None:
-            key = _category_key(resolver, value)
+            key = lookup_category(resolver, value)
             result = [product for product in result if product["category"] == key]
         return {"products": result}
 
@@ -218,18 +221,9 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     )
 
     async def set_category(call: ServiceCall) -> None:
-        coordinator = _get_coordinator(hass)
-        product = call.data[ATTR_PRODUCT]
-        if not await hass.async_add_executor_job(coordinator.store.has_product, product):
-            raise ServiceValidationError(
-                translation_domain=DOMAIN,
-                translation_key="unknown_product",
-                translation_placeholders={"product": product},
-            )
-        resolver = await hass.async_add_executor_job(coordinator.store.resolver)
-        key = _category_key(resolver, call.data[ATTR_CATEGORY])
-        await hass.async_add_executor_job(coordinator.store.set_category, product, key, "manual")
-        await coordinator.async_request_refresh()
+        await async_assign_category(
+            hass, _get_coordinator(hass), call.data[ATTR_PRODUCT], call.data[ATTR_CATEGORY]
+        )
 
     hass.services.async_register(
         DOMAIN, SERVICE_SET_CATEGORY, set_category, schema=SET_CATEGORY_SCHEMA
@@ -336,6 +330,37 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
         get_statistics,
         schema=GET_STATISTICS_SCHEMA,
         supports_response=SupportsResponse.ONLY,
+    )
+
+    async def watch_product(call: ServiceCall) -> None:
+        coordinator = _get_coordinator(hass)
+        await async_set_watched(
+            hass,
+            coordinator.config_entry,
+            call.data[ATTR_PRODUCT],
+            call.service == SERVICE_WATCH_PRODUCT,
+        )
+
+    for service in (SERVICE_WATCH_PRODUCT, SERVICE_UNWATCH_PRODUCT):
+        hass.services.async_register(DOMAIN, service, watch_product, schema=PRODUCT_SCHEMA)
+
+    async def create_category_action(call: ServiceCall) -> ServiceResponse:
+        coordinator = _get_coordinator(hass)
+        key = create_category(
+            hass,
+            coordinator.config_entry,
+            call.data[CONF_NAME],
+            call.data.get(CONF_KEYWORDS, ""),
+            call.data.get(CONF_DESCRIPTION, ""),
+        )
+        return {"key": key}
+
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_CREATE_CATEGORY,
+        create_category_action,
+        schema=CREATE_CATEGORY_SCHEMA,
+        supports_response=SupportsResponse.OPTIONAL,
     )
 
     hass.services.async_register(

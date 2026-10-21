@@ -39,7 +39,6 @@ from homeassistant.helpers.selector import (
     TextSelectorConfig,
     TextSelectorType,
 )
-from homeassistant.util import slugify
 from homeassistant.util.ssl import client_context
 
 from .const import (
@@ -68,6 +67,7 @@ from .mail import (
     MailConnectionError,
     MailFolderError,
 )
+from .management import category_key, category_name_error
 
 
 class GroceryTrackerConfigFlow(ConfigFlow, domain=DOMAIN):
@@ -267,29 +267,15 @@ def _category_schema(defaults: Mapping[str, Any]) -> vol.Schema:
 class CategorySubentryFlow(ConfigSubentryFlow):
     """Add or change a custom category."""
 
-    def _name_taken(self, name: str, own_subentry_id: str | None = None) -> bool:
-        folded = name.strip().casefold()
-        return any(
-            sub.subentry_type == SUBENTRY_CATEGORY
-            and sub.subentry_id != own_subentry_id
-            and sub.data[CONF_NAME].strip().casefold() == folded
-            for sub in self._get_entry().subentries.values()
-        )
-
     async def async_step_user(self, user_input: dict[str, Any] | None = None) -> SubentryFlowResult:
         """Ask for name, keywords and description."""
         errors: dict[str, str] = {}
         if user_input is not None:
             name = user_input[CONF_NAME].strip()
-            # The key never changes, so assignments survive renaming the category.
-            key = f"custom_{slugify(name)}"
-            if not any(char.isalnum() for char in name):
-                errors[CONF_NAME] = "invalid_name"
-            elif self._name_taken(name) or any(
-                sub.unique_id == key for sub in self._get_entry().subentries.values()
-            ):
-                errors[CONF_NAME] = "name_exists"
+            if error := category_name_error(self._get_entry(), name):
+                errors[CONF_NAME] = error
             else:
+                key = category_key(name)
                 return self.async_create_entry(
                     title=name,
                     data={**user_input, CONF_NAME: name, CONF_KEY: key},
@@ -309,10 +295,8 @@ class CategorySubentryFlow(ConfigSubentryFlow):
         errors: dict[str, str] = {}
         if user_input is not None:
             name = user_input[CONF_NAME].strip()
-            if not any(char.isalnum() for char in name):
-                errors[CONF_NAME] = "invalid_name"
-            elif self._name_taken(name, subentry.subentry_id):
-                errors[CONF_NAME] = "name_exists"
+            if error := category_name_error(self._get_entry(), name, subentry.subentry_id):
+                errors[CONF_NAME] = error
             else:
                 return self.async_update_and_abort(
                     self._get_entry(),

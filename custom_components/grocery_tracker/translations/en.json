@@ -94,6 +94,47 @@
     "button": {
       "check_mailboxes": {
         "name": "Check mailboxes"
+      },
+      "watch_product": {
+        "name": "Watch product"
+      },
+      "unwatch_product": {
+        "name": "Stop watching product"
+      },
+      "assign_category": {
+        "name": "Assign category"
+      },
+      "create_category": {
+        "name": "Create category"
+      }
+    },
+    "select": {
+      "product": {
+        "name": "Product"
+      },
+      "category": {
+        "name": "Category",
+        "state": {
+          "fruit_vegetables": "Fruit & vegetables",
+          "dairy_eggs": "Dairy & eggs",
+          "bakery": "Bread & bakery",
+          "meat_fish": "Meat, fish & alternatives",
+          "pantry": "Pantry",
+          "frozen": "Frozen",
+          "snacks_sweets": "Sweets & snacks",
+          "beverages": "Beverages",
+          "drugstore_household": "Drugstore & household",
+          "deposit": "Deposit",
+          "other": "Other"
+        }
+      }
+    },
+    "text": {
+      "new_category_name": {
+        "name": "New category"
+      },
+      "new_category_keywords": {
+        "name": "Keywords for new category"
       }
     }
   },
@@ -175,6 +216,44 @@
           "description": "Also return the list of receipts in the period."
         }
       }
+    },
+    "watch_product": {
+      "name": "Watch product",
+      "description": "Creates a price sensor for a product.",
+      "fields": {
+        "product": {
+          "name": "Product",
+          "description": "Product name exactly as on the receipt."
+        }
+      }
+    },
+    "unwatch_product": {
+      "name": "Stop watching product",
+      "description": "Removes the price sensor of a product.",
+      "fields": {
+        "product": {
+          "name": "Product",
+          "description": "Product name exactly as on the receipt."
+        }
+      }
+    },
+    "create_category": {
+      "name": "Create category",
+      "description": "Adds a custom category.",
+      "fields": {
+        "name": {
+          "name": "Name",
+          "description": "Name of the category."
+        },
+        "keywords": {
+          "name": "Keywords",
+          "description": "Comma separated keywords, e.g. WINDEL, HIPP."
+        },
+        "description": {
+          "name": "Description",
+          "description": "Optional: what belongs in this category, for the AI."
+        }
+      }
     }
   },
   "exceptions": {
@@ -201,6 +280,21 @@
     },
     "invalid_period": {
       "message": "The end of the period must not be before its start."
+    },
+    "no_product": {
+      "message": "Choose a product first."
+    },
+    "no_category": {
+      "message": "Choose a category first."
+    },
+    "no_new_category_name": {
+      "message": "Enter a name for the new category first."
+    },
+    "category_invalid_name": {
+      "message": "\"{name}\" is not a valid category name. Use letters or digits."
+    },
+    "category_name_exists": {
+      "message": "A category named \"{name}\" already exists."
     }
   },
   "selector": {

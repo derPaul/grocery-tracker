@@ -201,6 +201,30 @@ actions:
 Die Entity-IDs können bei dir abweichen – sie stehen unter *Einstellungen → Geräte & Dienste →
 Grocery Tracker → Entitäten*.
 
+**Produkte verfolgen und Warengruppen verwalten** (Entitäten-Karte): Produkt auswählen →
+*Produkt verfolgen* legt den Preis-Sensor an, *Produkt nicht mehr verfolgen* entfernt ihn.
+Produkt und Warengruppe auswählen → *Warengruppe zuordnen*. Name (und optional Stichwörter)
+eintragen → *Warengruppe anlegen*. Fehlt eine Auswahl, zeigt Home Assistant einen Hinweis.
+
+```yaml
+type: entities
+title: Produkte & Warengruppen
+entities:
+  - select.grocery_tracker_product
+  - button.grocery_tracker_watch_product
+  - button.grocery_tracker_stop_watching_product
+  - select.grocery_tracker_category
+  - button.grocery_tracker_assign_category
+  - type: divider
+  - text.grocery_tracker_new_category
+  - text.grocery_tracker_keywords_for_new_category
+  - button.grocery_tracker_create_category
+```
+
+Dieselben Funktionen gibt es als Aktionen für Skripte und Automationen:
+`grocery_tracker.watch_product`, `grocery_tracker.unwatch_product` (`product`) und
+`grocery_tracker.create_category` (`name`, optional `keywords`, `description`).
+
 **Letzter Einkauf mit allen Positionen** (Markdown-Karte):
 
 ```yaml

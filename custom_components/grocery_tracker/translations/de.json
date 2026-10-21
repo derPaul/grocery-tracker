@@ -94,6 +94,47 @@
     "button": {
       "check_mailboxes": {
         "name": "Postfächer abrufen"
+      },
+      "watch_product": {
+        "name": "Produkt verfolgen"
+      },
+      "unwatch_product": {
+        "name": "Produkt nicht mehr verfolgen"
+      },
+      "assign_category": {
+        "name": "Warengruppe zuordnen"
+      },
+      "create_category": {
+        "name": "Warengruppe anlegen"
+      }
+    },
+    "select": {
+      "product": {
+        "name": "Produkt"
+      },
+      "category": {
+        "name": "Warengruppe",
+        "state": {
+          "fruit_vegetables": "Obst & Gemüse",
+          "dairy_eggs": "Milchprodukte & Eier",
+          "bakery": "Brot & Backwaren",
+          "meat_fish": "Fleisch, Fisch & Alternativen",
+          "pantry": "Vorrat",
+          "frozen": "Tiefkühl",
+          "snacks_sweets": "Süßes & Snacks",
+          "beverages": "Getränke",
+          "drugstore_household": "Drogerie & Haushalt",
+          "deposit": "Pfand",
+          "other": "Sonstiges"
+        }
+      }
+    },
+    "text": {
+      "new_category_name": {
+        "name": "Neue Warengruppe"
+      },
+      "new_category_keywords": {
+        "name": "Stichwörter für neue Warengruppe"
       }
     }
   },
@@ -175,6 +216,44 @@
           "description": "Zusätzlich die Liste der Einkäufe im Zeitraum liefern."
         }
       }
+    },
+    "watch_product": {
+      "name": "Produkt verfolgen",
+      "description": "Legt einen Preis-Sensor für ein Produkt an.",
+      "fields": {
+        "product": {
+          "name": "Produkt",
+          "description": "Produktname genau wie auf dem Bon."
+        }
+      }
+    },
+    "unwatch_product": {
+      "name": "Produkt nicht mehr verfolgen",
+      "description": "Entfernt den Preis-Sensor eines Produkts.",
+      "fields": {
+        "product": {
+          "name": "Produkt",
+          "description": "Produktname genau wie auf dem Bon."
+        }
+      }
+    },
+    "create_category": {
+      "name": "Warengruppe anlegen",
+      "description": "Legt eine eigene Warengruppe an.",
+      "fields": {
+        "name": {
+          "name": "Name",
+          "description": "Name der Warengruppe."
+        },
+        "keywords": {
+          "name": "Stichwörter",
+          "description": "Durch Komma getrennt, z. B. WINDEL, HIPP."
+        },
+        "description": {
+          "name": "Beschreibung",
+          "description": "Optional: was in diese Gruppe gehört, für die KI."
+        }
+      }
     }
   },
   "exceptions": {
@@ -201,6 +280,21 @@
     },
     "invalid_period": {
       "message": "Das Ende des Zeitraums darf nicht vor dem Start liegen."
+    },
+    "no_product": {
+      "message": "Bitte zuerst ein Produkt auswählen."
+    },
+    "no_category": {
+      "message": "Bitte zuerst eine Warengruppe auswählen."
+    },
+    "no_new_category_name": {
+      "message": "Bitte zuerst einen Namen für die neue Warengruppe eingeben."
+    },
+    "category_invalid_name": {
+      "message": "„{name}“ ist kein gültiger Name. Bitte Buchstaben oder Ziffern verwenden."
+    },
+    "category_name_exists": {
+      "message": "Eine Warengruppe „{name}“ gibt es schon."
     }
   },
   "selector": {
