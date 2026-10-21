@@ -124,3 +124,7 @@ create_category:
       example: "Babynahrung, Windeln, Pflegeprodukte"
       selector:
         text:
+    icon:
+      example: "mdi:baby-bottle"
+      selector:
+        icon:

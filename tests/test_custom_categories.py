@@ -201,3 +201,27 @@ async def test_repair_installations_of_0_8_0(
     after = {e.entity_id for e in er.async_entries_for_config_entry(registry, entry.entry_id)}
     assert after == before
     assert all(hass.states.get(entity_id) for entity_id in after)
+
+
+async def test_category_icon(hass: HomeAssistant, inbox: Path) -> None:  # noqa: F811
+    entry = await _setup(hass, inbox)
+    await _add_category(hass, entry.entry_id, {"name": "Käse", "icon": "mdi:cheese"})
+    registry = er.async_get(hass)
+    sensor = registry.async_get_entity_id(
+        "sensor", DOMAIN, f"{entry.entry_id}_spending_this_month_custom_kase"
+    )
+    assert hass.states.get(sensor).attributes["icon"] == "mdi:cheese"
+
+    # Removing the icon falls back to the default icon of the integration.
+    entry = hass.config_entries.async_get_entry(entry.entry_id)
+    (subentry,) = entry.subentries.values()
+    result = await hass.config_entries.subentries.async_init(
+        (entry.entry_id, "category"),
+        context={"source": SOURCE_RECONFIGURE, "subentry_id": subentry.subentry_id},
+    )
+    result = await hass.config_entries.subentries.async_configure(
+        result["flow_id"], {"name": "Käse", "keywords": "", "description": ""}
+    )
+    assert result["reason"] == "reconfigure_successful"
+    await hass.async_block_till_done(wait_background_tasks=True)
+    assert "icon" not in hass.states.get(sensor).attributes

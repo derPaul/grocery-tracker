@@ -7,7 +7,7 @@ from pathlib import Path
 
 import voluptuous as vol
 
-from homeassistant.const import CONF_DESCRIPTION, CONF_NAME, Platform
+from homeassistant.const import CONF_DESCRIPTION, CONF_ICON, CONF_NAME, Platform
 from homeassistant.core import (
     HomeAssistant,
     ServiceCall,
@@ -90,6 +90,7 @@ CREATE_CATEGORY_SCHEMA = vol.Schema(
         vol.Required(CONF_NAME): cv.string,
         vol.Optional(CONF_KEYWORDS, default=""): cv.string,
         vol.Optional(CONF_DESCRIPTION, default=""): cv.string,
+        vol.Optional(CONF_ICON, default=""): vol.Any("", cv.icon),
     }
 )
 CATEGORIZE_PRODUCTS_SCHEMA = vol.Schema({vol.Optional(ATTR_ENTITY_ID): cv.entity_id})
@@ -352,6 +353,7 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
             call.data[CONF_NAME],
             call.data.get(CONF_KEYWORDS, ""),
             call.data.get(CONF_DESCRIPTION, ""),
+            call.data.get(CONF_ICON, ""),
         )
         return {"key": key}
 

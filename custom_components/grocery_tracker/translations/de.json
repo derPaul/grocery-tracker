@@ -135,6 +135,9 @@
       },
       "new_category_keywords": {
         "name": "Stichwörter für neue Warengruppe"
+      },
+      "new_category_icon": {
+        "name": "Icon für neue Warengruppe"
       }
     }
   },
@@ -252,6 +255,10 @@
         "description": {
           "name": "Beschreibung",
           "description": "Optional: was in diese Gruppe gehört, für die KI."
+        },
+        "icon": {
+          "name": "Icon",
+          "description": "Optionales Icon, z. B. mdi:baby-bottle."
         }
       }
     }
@@ -295,6 +302,9 @@
     },
     "category_name_exists": {
       "message": "Eine Warengruppe „{name}“ gibt es schon."
+    },
+    "invalid_icon": {
+      "message": "„{icon}“ ist kein gültiges Icon. Bitte in der Form mdi:name angeben, z. B. mdi:baby-bottle."
     }
   },
   "selector": {
@@ -393,11 +403,13 @@
           "data": {
             "name": "Name",
             "keywords": "Stichwörter",
-            "description": "Beschreibung für die KI"
+            "description": "Beschreibung für die KI",
+            "icon": "Icon"
           },
           "data_description": {
             "keywords": "Durch Komma getrennt, z. B. WINDEL, HIPP, BABY. Trifft irgendwo im Produktnamen; Umlaute wie auf dem Bon (UE) oder als ü.",
-            "description": "Optional: was in diese Gruppe gehört, z. B. „Babynahrung, Windeln, Pflegeprodukte für Babys“."
+            "description": "Optional: was in diese Gruppe gehört, z. B. „Babynahrung, Windeln, Pflegeprodukte für Babys“.",
+            "icon": "Optional, z. B. mdi:baby-bottle. Wird am Sensor der Warengruppe angezeigt."
           }
         },
         "reconfigure": {
@@ -406,10 +418,12 @@
           "data": {
             "name": "Name",
             "keywords": "Stichwörter",
-            "description": "Beschreibung für die KI"
+            "description": "Beschreibung für die KI",
+            "icon": "Icon"
           },
           "data_description": {
-            "keywords": "Durch Komma getrennt, z. B. WINDEL, HIPP, BABY."
+            "keywords": "Durch Komma getrennt, z. B. WINDEL, HIPP, BABY.",
+            "icon": "Optional, z. B. mdi:baby-bottle. Wird am Sensor der Warengruppe angezeigt."
           }
         }
       },

@@ -126,8 +126,10 @@ Die Zuordnung erfolgt in dieser Reihenfolge:
 
 **Eigene Warengruppen** legst du unter *Einstellungen → Geräte & Dienste → Grocery Tracker →
 Warengruppe hinzufügen* an: Name, optional Stichwörter (durch Komma getrennt, z. B.
-`WINDEL, HIPP`; Umlaute als `UE` wie auf dem Bon oder als `ü`) und optional eine Beschreibung
-für die KI. Jede eigene Gruppe bekommt einen Sensor „*Name* diesen Monat". Beim Umbenennen
+`WINDEL, HIPP`; Umlaute als `UE` wie auf dem Bon oder als `ü`), optional eine Beschreibung
+für die KI und optional ein Icon (z. B. `mdi:baby-bottle`). Jede eigene Gruppe bekommt einen
+Sensor „*Name* diesen Monat" mit diesem Icon. Die Icons der eingebauten Warengruppen änderst du
+wie bei jeder Entität: Sensor öffnen → Zahnrad → Icon. Beim Umbenennen
 bleiben Zuordnungen erhalten; wird eine Gruppe gelöscht, fallen ihre Produkte auf die übrigen
 Regeln zurück. In `set_category` und `list_products` kannst du eigene Gruppen über ihren
 Namen ansprechen.
@@ -203,8 +205,8 @@ Grocery Tracker → Entitäten*.
 
 **Produkte verfolgen und Warengruppen verwalten** (Entitäten-Karte): Produkt auswählen →
 *Produkt verfolgen* legt den Preis-Sensor an, *Produkt nicht mehr verfolgen* entfernt ihn.
-Produkt und Warengruppe auswählen → *Warengruppe zuordnen*. Name (und optional Stichwörter)
-eintragen → *Warengruppe anlegen*. Fehlt eine Auswahl, zeigt Home Assistant einen Hinweis.
+Produkt und Warengruppe auswählen → *Warengruppe zuordnen*. Name (und optional Stichwörter und
+Icon, z. B. `mdi:cheese`) eintragen → *Warengruppe anlegen*. Fehlt eine Auswahl, zeigt Home Assistant einen Hinweis.
 
 ```yaml
 type: entities
@@ -218,12 +220,13 @@ entities:
   - type: divider
   - text.grocery_tracker_new_category
   - text.grocery_tracker_keywords_for_new_category
+  - text.grocery_tracker_icon_for_new_category
   - button.grocery_tracker_create_category
 ```
 
 Dieselben Funktionen gibt es als Aktionen für Skripte und Automationen:
 `grocery_tracker.watch_product`, `grocery_tracker.unwatch_product` (`product`) und
-`grocery_tracker.create_category` (`name`, optional `keywords`, `description`).
+`grocery_tracker.create_category` (`name`, optional `keywords`, `description`, `icon`).
 
 **Letzter Einkauf mit allen Positionen** (Markdown-Karte):
 

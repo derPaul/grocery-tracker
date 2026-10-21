@@ -135,6 +135,9 @@
       },
       "new_category_keywords": {
         "name": "Keywords for new category"
+      },
+      "new_category_icon": {
+        "name": "Icon for new category"
       }
     }
   },
@@ -252,6 +255,10 @@
         "description": {
           "name": "Description",
           "description": "Optional: what belongs in this category, for the AI."
+        },
+        "icon": {
+          "name": "Icon",
+          "description": "Optional icon, e.g. mdi:baby-bottle."
         }
       }
     }
@@ -295,6 +302,9 @@
     },
     "category_name_exists": {
       "message": "A category named \"{name}\" already exists."
+    },
+    "invalid_icon": {
+      "message": "\"{icon}\" is not a valid icon. Use the form mdi:name, e.g. mdi:baby-bottle."
     }
   },
   "selector": {
@@ -393,11 +403,13 @@
           "data": {
             "name": "Name",
             "keywords": "Keywords",
-            "description": "Description for the AI"
+            "description": "Description for the AI",
+            "icon": "Icon"
           },
           "data_description": {
             "keywords": "Comma separated, e.g. WINDEL, HIPP, BABY. Matched anywhere in the product name; umlauts may be written as on the receipt (UE) or as ü.",
-            "description": "Optional: what belongs in this category, e.g. \"baby food, diapers, care products for babies\"."
+            "description": "Optional: what belongs in this category, e.g. \"baby food, diapers, care products for babies\".",
+            "icon": "Optional, e.g. mdi:baby-bottle. Shown on the category's sensor."
           }
         },
         "reconfigure": {
@@ -406,10 +418,12 @@
           "data": {
             "name": "Name",
             "keywords": "Keywords",
-            "description": "Description for the AI"
+            "description": "Description for the AI",
+            "icon": "Icon"
           },
           "data_description": {
-            "keywords": "Comma separated, e.g. WINDEL, HIPP, BABY."
+            "keywords": "Comma separated, e.g. WINDEL, HIPP, BABY.",
+            "icon": "Optional, e.g. mdi:baby-bottle. Shown on the category's sensor."
           }
         }
       },

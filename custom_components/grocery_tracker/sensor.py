@@ -14,7 +14,7 @@ from homeassistant.components.sensor import (
     SensorEntityDescription,
     SensorStateClass,
 )
-from homeassistant.const import CONF_NAME, CURRENCY_EURO, EntityCategory
+from homeassistant.const import CONF_ICON, CONF_NAME, CURRENCY_EURO, EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.device_registry import DeviceEntryType, DeviceInfo
@@ -214,6 +214,8 @@ def _custom_category_description(data: Mapping[str, Any]) -> GrocerySensorEntity
         key=f"spending_this_month_{key}",
         translation_key="spending_this_month_custom",
         translation_placeholders={"category": data[CONF_NAME]},
+        # None falls back to the icon from icons.json.
+        icon=data.get(CONF_ICON) or None,
         device_class=SensorDeviceClass.MONETARY,
         native_unit_of_measurement=CURRENCY_EURO,
         suggested_display_precision=2,

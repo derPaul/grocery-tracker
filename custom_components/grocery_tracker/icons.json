@@ -102,6 +102,9 @@
       },
       "new_category_keywords": {
         "default": "mdi:text-search"
+      },
+      "new_category_icon": {
+        "default": "mdi:emoticon-outline"
       }
     }
   },

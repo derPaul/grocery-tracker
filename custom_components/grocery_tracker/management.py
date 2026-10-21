@@ -4,10 +4,13 @@ from __future__ import annotations
 
 from types import MappingProxyType
 
+import voluptuous as vol
+
 from homeassistant.config_entries import ConfigEntry, ConfigSubentry
-from homeassistant.const import CONF_DESCRIPTION, CONF_NAME
+from homeassistant.const import CONF_DESCRIPTION, CONF_ICON, CONF_NAME
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ServiceValidationError
+import homeassistant.helpers.config_validation as cv
 from homeassistant.util import slugify
 
 from .categories import CATEGORIES, CategoryResolver
@@ -80,15 +83,26 @@ def create_category(
     name: str,
     keywords: str = "",
     description: str = "",
+    icon: str = "",
 ) -> str:
     """Add a custom category subentry and return its key; the entry reloads."""
     name = name.strip()
+    icon = icon.strip()
     if (error := category_name_error(entry, name)) is not None:
         raise ServiceValidationError(
             translation_domain=DOMAIN,
             translation_key=f"category_{error}",
             translation_placeholders={"name": name},
         )
+    if icon:
+        try:
+            cv.icon(icon)
+        except vol.Invalid as err:
+            raise ServiceValidationError(
+                translation_domain=DOMAIN,
+                translation_key="invalid_icon",
+                translation_placeholders={"icon": icon},
+            ) from err
     key = category_key(name)
     hass.config_entries.async_add_subentry(
         entry,
@@ -99,6 +113,7 @@ def create_category(
                     CONF_KEYWORDS: keywords,
                     CONF_DESCRIPTION: description,
                     CONF_KEY: key,
+                    **({CONF_ICON: icon} if icon else {}),
                 }
             ),
             subentry_type=SUBENTRY_CATEGORY,

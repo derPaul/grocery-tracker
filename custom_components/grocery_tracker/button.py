@@ -15,7 +15,7 @@ from .coordinator import GroceryTrackerConfigEntry, GroceryTrackerCoordinator
 from .management import async_assign_category, async_set_watched, create_category
 from .select import SELECTED_CATEGORY, SELECTED_PRODUCT
 from .sensor import _device_info
-from .text import NEW_CATEGORY_KEYWORDS, NEW_CATEGORY_NAME
+from .text import NEW_CATEGORY_ICON, NEW_CATEGORY_KEYWORDS, NEW_CATEGORY_NAME
 
 
 def _selected(coordinator: GroceryTrackerCoordinator, key: str) -> str:
@@ -44,19 +44,23 @@ async def _assign(hass: HomeAssistant, coordinator: GroceryTrackerCoordinator) -
 async def _create(hass: HomeAssistant, coordinator: GroceryTrackerCoordinator) -> None:
     name = _selected(coordinator, NEW_CATEGORY_NAME)
     keywords = coordinator.selection.get(NEW_CATEGORY_KEYWORDS) or ""
+    icon = coordinator.selection.get(NEW_CATEGORY_ICON) or ""
     # Clear the inputs first: creating the category starts the reload right
     # away, and the inputs restore whatever state they have at that moment.
-    _set_inputs(coordinator, "", "")
+    _set_inputs(coordinator, "", "", "")
     try:
-        create_category(hass, coordinator.config_entry, name, keywords)
+        create_category(hass, coordinator.config_entry, name, keywords, icon=icon)
     except ServiceValidationError:
-        _set_inputs(coordinator, name, keywords)
+        _set_inputs(coordinator, name, keywords, icon)
         raise
 
 
-def _set_inputs(coordinator: GroceryTrackerCoordinator, name: str, keywords: str) -> None:
+def _set_inputs(
+    coordinator: GroceryTrackerCoordinator, name: str, keywords: str, icon: str
+) -> None:
     coordinator.selection[NEW_CATEGORY_NAME] = name
     coordinator.selection[NEW_CATEGORY_KEYWORDS] = keywords
+    coordinator.selection[NEW_CATEGORY_ICON] = icon
     coordinator.async_update_listeners()
 
 

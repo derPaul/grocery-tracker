@@ -13,6 +13,7 @@ from .sensor import _device_info
 
 NEW_CATEGORY_NAME = "new_category_name"
 NEW_CATEGORY_KEYWORDS = "new_category_keywords"
+NEW_CATEGORY_ICON = "new_category_icon"
 
 
 async def async_setup_entry(
@@ -23,7 +24,8 @@ async def async_setup_entry(
     """Set up the text inputs."""
     coordinator = entry.runtime_data
     async_add_entities(
-        SelectionText(coordinator, key) for key in (NEW_CATEGORY_NAME, NEW_CATEGORY_KEYWORDS)
+        SelectionText(coordinator, key)
+        for key in (NEW_CATEGORY_NAME, NEW_CATEGORY_KEYWORDS, NEW_CATEGORY_ICON)
     )
 
 

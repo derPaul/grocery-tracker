@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+import voluptuous as vol
 
 from custom_components.grocery_tracker.const import (
     DOMAIN,
@@ -148,3 +149,39 @@ async def test_actions(hass: HomeAssistant, entry_id: str) -> None:
         er.async_get(hass).async_get_entity_id("sensor", DOMAIN, f"{entry_id}_price_MINERALWASSER")
         is None
     )
+
+
+async def test_category_icon_from_dashboard_and_action(hass: HomeAssistant, entry_id: str) -> None:
+    name = _entity(hass, "text", f"{entry_id}_text_new_category_name")
+    icon = _entity(hass, "text", f"{entry_id}_text_new_category_icon")
+    create = _entity(hass, "button", f"{entry_id}_create_category")
+    for entity_id, value in ((name, "Käse"), (icon, "kaese")):
+        await hass.services.async_call(
+            "text", "set_value", {"entity_id": entity_id, "value": value}, blocking=True
+        )
+
+    with pytest.raises(ServiceValidationError) as exc_info:
+        await _press(hass, create)
+    assert exc_info.value.translation_key == "invalid_icon"
+    # The inputs are kept so the icon can be corrected.
+    assert hass.states.get(name).state == "Käse"
+    assert hass.states.get(icon).state == "kaese"
+
+    await hass.services.async_call(
+        "text", "set_value", {"entity_id": icon, "value": "mdi:cheese"}, blocking=True
+    )
+    await _press(hass, create)
+    sensor = _entity(hass, "sensor", f"{entry_id}_spending_this_month_custom_kase")
+    assert hass.states.get(sensor).attributes["icon"] == "mdi:cheese"
+    assert hass.states.get(icon).state == ""
+
+    await hass.services.async_call(
+        DOMAIN, SERVICE_CREATE_CATEGORY, {"name": "Baby", "icon": "mdi:baby-bottle"}, blocking=True
+    )
+    await hass.async_block_till_done(wait_background_tasks=True)
+    sensor = _entity(hass, "sensor", f"{entry_id}_spending_this_month_custom_baby")
+    assert hass.states.get(sensor).attributes["icon"] == "mdi:baby-bottle"
+    with pytest.raises(vol.Invalid):
+        await hass.services.async_call(
+            DOMAIN, SERVICE_CREATE_CATEGORY, {"name": "Tee", "icon": "tee"}, blocking=True
+        )

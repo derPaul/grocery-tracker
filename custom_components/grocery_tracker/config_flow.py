@@ -20,6 +20,7 @@ from homeassistant.config_entries import (
 )
 from homeassistant.const import (
     CONF_DESCRIPTION,
+    CONF_ICON,
     CONF_NAME,
     CONF_PASSWORD,
     CONF_PORT,
@@ -28,6 +29,7 @@ from homeassistant.const import (
 from homeassistant.core import callback
 from homeassistant.helpers.selector import (
     DateSelector,
+    IconSelector,
     NumberSelector,
     NumberSelectorConfig,
     NumberSelectorMode,
@@ -260,6 +262,9 @@ def _category_schema(defaults: Mapping[str, Any]) -> vol.Schema:
             vol.Required(CONF_NAME, default=defaults.get(CONF_NAME, vol.UNDEFINED)): str,
             vol.Optional(CONF_KEYWORDS, default=defaults.get(CONF_KEYWORDS, "")): str,
             vol.Optional(CONF_DESCRIPTION, default=defaults.get(CONF_DESCRIPTION, "")): str,
+            vol.Optional(
+                CONF_ICON, description={"suggested_value": defaults.get(CONF_ICON)}
+            ): IconSelector(),
         }
     )
 
