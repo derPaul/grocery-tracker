@@ -149,6 +149,32 @@
     "check_mailboxes": {
       "name": "Postfächer abrufen",
       "description": "Durchsucht alle Postfächer sofort nach neuen eBons und gibt zurück, was gefunden wurde."
+    },
+    "get_statistics": {
+      "name": "Statistik abfragen",
+      "description": "Liefert Ausgaben, Einkäufe, Ausgaben je Warengruppe und die Top-Produkte für einen Zeitraum – je Monat und insgesamt.",
+      "fields": {
+        "months": {
+          "name": "Monate",
+          "description": "Der laufende und die vorherigen Monate (1 = dieser Monat). Nicht zusammen mit Start."
+        },
+        "start": {
+          "name": "Start",
+          "description": "Erster Tag des Zeitraums."
+        },
+        "end": {
+          "name": "Ende",
+          "description": "Letzter Tag des Zeitraums (Standard: heute)."
+        },
+        "top": {
+          "name": "Top-Produkte",
+          "description": "Anzahl der Produkte mit den höchsten Ausgaben."
+        },
+        "receipts": {
+          "name": "Einkäufe",
+          "description": "Zusätzlich die Liste der Einkäufe im Zeitraum liefern."
+        }
+      }
     }
   },
   "exceptions": {
@@ -172,6 +198,9 @@
     },
     "unknown_category": {
       "message": "Unbekannte Warengruppe „{category}“. Möglich: {categories}."
+    },
+    "invalid_period": {
+      "message": "Das Ende des Zeitraums darf nicht vor dem Start liegen."
     }
   },
   "selector": {

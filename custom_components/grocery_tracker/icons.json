@@ -92,6 +92,9 @@
     },
     "check_mailboxes": {
       "service": "mdi:email-sync"
+    },
+    "get_statistics": {
+      "service": "mdi:chart-box-outline"
     }
   }
 }

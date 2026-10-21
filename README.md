@@ -76,6 +76,38 @@ data:
   search: milch
 ```
 
+## Statistik abfragen
+
+Die Aktion `grocery_tracker.get_statistics` liefert für einen Zeitraum die Ausgaben, die Zahl der
+Einkäufe, die Ausgaben je Warengruppe und die Top-Produkte – insgesamt und je Monat. Der Zeitraum
+ist entweder `months` (der laufende und die vorherigen Monate, Standard 1) oder `start`/`end`
+(Datum, `end` standardmäßig heute). `top` legt die Zahl der Top-Produkte fest (Standard 10),
+`receipts: true` liefert zusätzlich alle Einkäufe im Zeitraum.
+
+```yaml
+action: grocery_tracker.get_statistics
+data:
+  months: 3
+  receipts: true
+```
+
+Antwort (gekürzt):
+
+```yaml
+start: "2024-01-01"
+end: "2024-03-20"
+total: 31.9
+receipts: 3
+by_category: {fruit_vegetables: 4.47, dairy_eggs: 9.65, ...}
+top_products:
+  - {name: BIO H-MILCH 1,5%, category: dairy_eggs, amount: 3.67, purchases: 3}
+months:
+  - {month: "2024-01", amount: 10.6, receipts: 1, by_category: {...}}
+  - ...
+receipt_list:
+  - {uid: ..., store: REWE, timestamp: "2024-03-19T18:23:00+01:00", total: 10.7, item_count: 7}
+```
+
 ## Warengruppen
 
 Jedes Produkt wird einer Warengruppe zugeordnet: Obst & Gemüse, Milchprodukte & Eier,

@@ -149,6 +149,32 @@
     "check_mailboxes": {
       "name": "Check mailboxes",
       "description": "Checks all mailboxes for new eBons now and returns what was found."
+    },
+    "get_statistics": {
+      "name": "Get statistics",
+      "description": "Returns spending, receipts, spending per category and the top products for a period – per month and in total.",
+      "fields": {
+        "months": {
+          "name": "Months",
+          "description": "The current and the previous months (1 = this month). Not together with start."
+        },
+        "start": {
+          "name": "Start",
+          "description": "First day of the period."
+        },
+        "end": {
+          "name": "End",
+          "description": "Last day of the period (default: today)."
+        },
+        "top": {
+          "name": "Top products",
+          "description": "Number of products with the highest spending."
+        },
+        "receipts": {
+          "name": "Receipts",
+          "description": "Also return the list of receipts in the period."
+        }
+      }
     }
   },
   "exceptions": {
@@ -172,6 +198,9 @@
     },
     "unknown_category": {
       "message": "Unknown category \"{category}\". Possible: {categories}."
+    },
+    "invalid_period": {
+      "message": "The end of the period must not be before its start."
     }
   },
   "selector": {
